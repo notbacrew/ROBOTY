@@ -1,45 +1,42 @@
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import json
 
-def show_visualization(plan):
-    """
-    Визуализация траекторий роботов.
-    На вход подаётся объект плана.
-    """
-    data = plan  # теперь план — это уже объект, а не путь
+with open('data/example_schedule.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
 
-    fig = go.Figure()
+def plot_trajectories(robots):
+    # Можно использовать ту же реализацию, что и show_visualization
+    show_visualization(robots)
 
-    # Для каждого робота рисуем траекторию
-    for robot in data["robots"]:
-        xs = [p["x"] for p in robot["trajectory"]]
-        ys = [p["y"] for p in robot["trajectory"]]
-        zs = [p["z"] for p in robot["trajectory"]]
+def load_output_file(filepath):
+    robots = []
+    with open(filepath, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    robot = None
+    for line in lines:
+        if line.startswith("Robot"):
+            if robot:
+                robots.append(robot)
+            robot = {'waypoints': []}
+        elif line.strip() and not line.startswith("Makespan"):
+            parts = line.strip().split()
+            if len(parts) == 4:
+                t, x, y, z = map(float, parts)
+                robot['waypoints'].append((x, y, z))
+    if robot:
+        robots.append(robot)
+    return robots
 
-        fig.add_trace(go.Scatter3d(
-            x=xs, y=ys, z=zs,
-            mode="lines+markers",
-            name=f"Robot {robot['id']}",
-            line=dict(width=4),
-            marker=dict(size=4)
-        ))
-
-    # Добавим подпись makespan
-    makespan = data.get("makespan", None)
-    if makespan is not None:
-        fig.update_layout(
-            title=f"Robot Trajectories (makespan = {makespan:.2f} sec)"
-        )
-    else:
-        fig.update_layout(title="Robot Trajectories")
-
-    fig.update_layout(
-        scene=dict(
-            xaxis_title="X",
-            yaxis_title="Y",
-            zaxis_title="Z"
-        ),
-        margin=dict(l=0, r=0, b=0, t=30)
-    )
-
-    fig.show()
+def show_visualization(robots):
+    for idx, robot in enumerate(robots):
+        if robot['waypoints']:
+            xs, ys, zs = zip(*robot['waypoints'])
+            plt.plot(xs, ys, label=f'Robot {idx+1}')         # добавлен label
+            plt.scatter(xs, ys, label=f'Points {idx+1}')     # добавлен label
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Robot Trajectories')
+    plt.legend()
+    plt.grid()
+    plt.show()
 

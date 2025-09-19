@@ -1,0 +1,5 @@
+Makespan: 0.00
+Robot 1: 0 waypoints
+
+Robot 2: 0 waypoints
+

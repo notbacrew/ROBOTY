@@ -83,9 +83,97 @@ def parse_input(path: str) -> Scenario:
         operations=operations
     )
 
-def parse_input_file(path):
-    # Обертка для совместимости с импортом
-    return parse_input(path)
+def parse_input_file(filepath):
+    if filepath.endswith('.json'):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        K = len(data.get('robots', []))
+        # Извлекаем joints для каждого робота, если есть
+        joints = []
+        for robot in data.get('robots', []):
+            robot_joints = []
+            for joint in robot.get('joints', []):
+                # joint — это словарь, преобразуем в кортеж (min, max, v_max, a_max)
+                robot_joints.append((
+                    joint.get('min', 0),
+                    joint.get('max', 0),
+                    joint.get('v_max', 0),
+                    joint.get('a_max', 0)
+                ))
+            joints.append(robot_joints)
+        operations = []
+        for op in data.get('operations', []):
+            operations.append({
+                'pick': tuple(op['pick']),
+                'place': tuple(op['place']),
+                't': op['t']
+            })
+        return {
+            'K': K,
+            'N': len(operations),
+            'bases': [tuple(r['base']) for r in data.get('robots', [])],
+            'joints': joints,  # теперь это список списков кортежей
+            'tool_clearance': data.get('tool_clearance', 50),
+            'safe_dist': data.get('safe_dist', 100),
+            'operations': operations
+        }
+    else:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = [line.strip() for line in f if line.strip()]
+        K, N = map(int, lines[0].split())
+        bases = []
+        for i in range(K):
+            bases.append(tuple(map(float, lines[1 + i].split())))
+        joints = []
+        for i in range(6):
+            joints.append(tuple(map(float, lines[1 + K + i].split())))
+        tool_clearance, safe_dist = map(float, lines[1 + K + 6].split())
+        operations = []
+        for i in range(N):
+            parts = lines[1 + K + 7 + i].split()
+            pick = tuple(map(float, parts[:3]))
+            place = tuple(map(float, parts[3:6]))
+            t = float(parts[6])
+            operations.append({'pick': pick, 'place': place, 't': t})
+        return {
+            'K': K,
+            'N': N,
+            'bases': bases,
+            'joints': [joints],  # для совместимости с JSON-структурой
+            'tool_clearance': tool_clearance,
+            'safe_dist': safe_dist,
+            'operations': operations
+        }
+
+# Unit-test
+def test_parse_input_file():
+    import tempfile
+    content = """2 2
+0 0 0
+100 0 0
+-170 170 120 300
+-120 120 120 300
+-170 170 120 300
+-120 120 120 300
+-170 170 120 300
+-120 120 120 300
+50 100
+100 200 300 400 500 600 500
+150 250 350 450 550 650 600
+"""
+    with tempfile.NamedTemporaryFile('w+', delete=False) as f:
+        f.write(content)
+        f.flush()
+        result = parse_input_file(f.name)
+        assert result['K'] == 2
+        assert result['N'] == 2
+        assert len(result['bases']) == 2
+        assert len(result['joints']) == 6
+        assert len(result['operations']) == 2
+    print("Parser test passed.")
+
+if __name__ == "__main__":
+    test_parse_input_file()
 
 # ---- ЗАПИСЬ РЕЗУЛЬТАТА ----
 def save_output(path: str, schedule: dict):

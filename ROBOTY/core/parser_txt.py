@@ -1,18 +1,23 @@
 def save_plan_to_txt(filename, makespan, robots_waypoints):
     """
-    Сохраняет план в текстовый файл в формате ТЗ.
+    Сохраняет план в текстовый файл в формате ТЗ с комментариями для удобства чтения.
     filename: путь к файлу
     makespan: общее время выполнения (мс)
     robots_waypoints: список кортежей (robot_id, waypoints)
     waypoints: список (t, x, y, z)
     """
     with open(filename, 'w', encoding='utf-8') as f:
-        f.write(f"{makespan:.2f}\n")
+        f.write("# Результаты планирования роботов\n")
+        f.write("# Makespan (общее время выполнения всех операций, мс):\n")
+        f.write(f"{makespan:.2f}\n\n")
         for robot_id, waypoints in robots_waypoints:
+            f.write(f"# Робот R{robot_id}, количество точек маршрута = {len(waypoints)}\n")
+            f.write("# Формат: t (мс)   X   Y   Z\n")
             f.write(f"R{robot_id} {len(waypoints)}\n")
             for wp in waypoints:
                 t, x, y, z = wp
-                f.write(f"{t:.2f} {x:.3f} {y:.3f} {z:.3f}\n")
+                f.write(f"t={t:.2f}ms   x={x:.3f}   y={y:.3f}   z={z:.3f}\n")
+            f.write("\n")
 import re
 from typing import List, Tuple
 

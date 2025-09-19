@@ -18,6 +18,7 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.input_data = None
         self.plan = None
         self.pushButton_save.clicked.connect(self.save_result)
+
     def save_result(self):
         if not self.plan:
             self.textLog.append("Нет плана для сохранения. Сначала запустите планировщик.")
@@ -31,8 +32,13 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 robots_waypoints = []
                 for robot in self.plan["robots"]:
                     waypoints = []
-                    for wp in robot["trajectory"]:
-                        waypoints.append((wp["t"], wp["x"], wp["y"], wp["z"]))
+                    self.textLog.append(str(robot["trajectory"]))
+                    for i, wp in enumerate(robot["trajectory"]):
+                        t = wp.get("t", float(i))
+                        x = wp.get("x", 0.0)
+                        y = wp.get("y", 0.0)
+                        z = wp.get("z", 0.0)
+                        waypoints.append((t, x, y, z))
                     robots_waypoints.append((robot["id"], waypoints))
                 makespan = self.plan.get("makespan", 0.0)
                 save_plan_to_txt(path, makespan, robots_waypoints)

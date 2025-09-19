@@ -11,9 +11,9 @@ def show_visualization(plan):
 
     # Для каждого робота рисуем траекторию и зоны безопасности
     for robot in data["robots"]:
-        xs = [p["x"] for p in robot["trajectory"]]
-        ys = [p["y"] for p in robot["trajectory"]]
-        zs = [p["z"] for p in robot["trajectory"]]
+        xs = [p["x"] + robot["base_xyz"][0] for p in robot["trajectory"]]
+        ys = [p["y"] + robot["base_xyz"][1] for p in robot["trajectory"]]
+        zs = [p["z"] + robot["base_xyz"][2] for p in robot["trajectory"]]
 
         fig.add_trace(go.Scatter3d(
             x=xs, y=ys, z=zs,
@@ -45,13 +45,19 @@ def show_visualization(plan):
                     continue
                 for p1 in r1["trajectory"]:
                     for p2 in r2["trajectory"]:
-                        dist = ((p1["x"]-p2["x"])**2 + (p1["y"]-p2["y"])**2 + (p1["z"]-p2["z"])**2)**0.5
+                        x1 = p1["x"] + r1["base_xyz"][0]
+                        y1 = p1["y"] + r1["base_xyz"][1]
+                        z1 = p1["z"] + r1["base_xyz"][2]
+                        x2 = p2["x"] + r2["base_xyz"][0]
+                        y2 = p2["y"] + r2["base_xyz"][1]
+                        z2 = p2["z"] + r2["base_xyz"][2]
+                        dist = ((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)**0.5
                         min_dist = data["safe_dist"] + r1.get("tool_clearance",0) + r2.get("tool_clearance",0)
                         if dist < min_dist:
                             fig.add_trace(go.Scatter3d(
-                                x=[p1["x"], p2["x"]],
-                                y=[p1["y"], p2["y"]],
-                                z=[p1["z"], p2["z"]],
+                                x=[x1, x2],
+                                y=[y1, y2],
+                                z=[z1, z2],
                                 mode="lines",
                                 line=dict(color="red", width=8, dash="dot"),
                                 name="Collision!"
@@ -76,4 +82,3 @@ def show_visualization(plan):
     )
 
     fig.show()
-

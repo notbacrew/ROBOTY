@@ -9,7 +9,7 @@ def show_visualization(plan):
 
     fig = go.Figure()
 
-    # Для каждого робота рисуем траекторию
+    # Для каждого робота рисуем траекторию и зоны безопасности
     for robot in data["robots"]:
         xs = [p["x"] for p in robot["trajectory"]]
         ys = [p["y"] for p in robot["trajectory"]]
@@ -22,6 +22,40 @@ def show_visualization(plan):
             line=dict(width=4),
             marker=dict(size=4)
         ))
+
+        # Отрисовка сфер безопасности вокруг каждого waypoint
+        if "tool_clearance" in robot:
+            for x, y, z in zip(xs, ys, zs):
+                fig.add_trace(go.Scatter3d(
+                    x=[x], y=[y], z=[z],
+                    mode="markers",
+                    marker=dict(
+                        size=robot["tool_clearance"]*20,  # масштаб
+                        color="rgba(200,100,100,0.2)"
+                    ),
+                    showlegend=False
+                ))
+
+    # Индикация нарушений safe_dist (упрощённо)
+    if "safe_dist" in data:
+        # Проверяем все пары точек
+        for i, r1 in enumerate(data["robots"]):
+            for j, r2 in enumerate(data["robots"]):
+                if i >= j:
+                    continue
+                for p1 in r1["trajectory"]:
+                    for p2 in r2["trajectory"]:
+                        dist = ((p1["x"]-p2["x"])**2 + (p1["y"]-p2["y"])**2 + (p1["z"]-p2["z"])**2)**0.5
+                        min_dist = data["safe_dist"] + r1.get("tool_clearance",0) + r2.get("tool_clearance",0)
+                        if dist < min_dist:
+                            fig.add_trace(go.Scatter3d(
+                                x=[p1["x"], p2["x"]],
+                                y=[p1["y"], p2["y"]],
+                                z=[p1["z"], p2["z"]],
+                                mode="lines",
+                                line=dict(color="red", width=8, dash="dot"),
+                                name="Collision!"
+                            ))
 
     # Добавим подпись makespan
     makespan = data.get("makespan", None)

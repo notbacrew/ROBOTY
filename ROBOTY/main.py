@@ -5,6 +5,8 @@ from core.parser import parse_input_file
 from core.planner import run_planner_algorithm
 from core.collision import check_collisions
 from viz.visualizer import show_visualization
+from core.parser_txt import RobotConfig, Operation
+import math
 
 class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -15,6 +17,28 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pushButton_viz.clicked.connect(self.open_visualizer)
         self.input_data = None
         self.plan = None
+        self.pushButton_save.clicked.connect(self.save_result)
+    def save_result(self):
+        if not self.plan:
+            self.textLog.append("Нет плана для сохранения. Сначала запустите планировщик.")
+            return
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить результат", "result.txt", "Text Files (*.txt)")
+        if path:
+            try:
+                # Пример: формируем структуру для сохранения
+                from core.parser_txt import save_plan_to_txt
+                # Предполагается, что self.plan содержит 'makespan' и 'robots' с 'trajectory'
+                robots_waypoints = []
+                for robot in self.plan["robots"]:
+                    waypoints = []
+                    for wp in robot["trajectory"]:
+                        waypoints.append((wp["t"], wp["x"], wp["y"], wp["z"]))
+                    robots_waypoints.append((robot["id"], waypoints))
+                makespan = self.plan.get("makespan", 0.0)
+                save_plan_to_txt(path, makespan, robots_waypoints)
+                self.textLog.append(f"Результат сохранён: {path}")
+            except Exception as e:
+                self.textLog.append(f"Ошибка сохранения: {e}")
 
     def load_file(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Выберите входной файл", "data/")
@@ -51,6 +75,10 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
             self.textLog.append("Визуализация завершена.")
         except Exception as e:
             self.textLog.append(f"Ошибка визуализации: {e}")
+
+def check_kinematics(robot: RobotConfig, point: tuple) -> bool:
+    # ...код функции...
+    pass
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

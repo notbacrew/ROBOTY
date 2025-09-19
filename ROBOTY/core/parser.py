@@ -72,14 +72,16 @@ def parse_input(path: str) -> Scenario:
             id=o["id"],
             pick_xyz=tuple(o["pick_xyz"]),
             place_xyz=tuple(o["place_xyz"]),
-            t_hold=o["t_hold"]
+            t_hold=o["t_hold"] if "t_hold" in o else 0.0
         )
         for o in data["operations"]
     ]
 
+    safe_dist = data["safe_dist"] if "safe_dist" in data else 0.0
+
     return Scenario(
         robots=robots,
-        safe_dist=data["safe_dist"],
+        safe_dist=safe_dist,
         operations=operations
     )
 

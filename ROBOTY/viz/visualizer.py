@@ -28,15 +28,18 @@ def load_output_file(filepath):
     return robots
 
 def show_visualization(robots):
+    has_data = False
     for idx, robot in enumerate(robots):
         if robot['waypoints']:
             xs, ys, zs = zip(*robot['waypoints'])
             plt.plot(xs, ys, label=f'Robot {idx+1}')         # добавлен label
             plt.scatter(xs, ys, label=f'Points {idx+1}')     # добавлен label
+            has_data = True
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.title('Robot Trajectories')
-    plt.legend()
+    if has_data:
+        plt.legend()
     plt.grid()
-    plt.show()
+    plt.show(block=False)
 

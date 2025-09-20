@@ -1,6 +1,10 @@
 import json
+import logging
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+
+# Настройка логгера для модуля парсинга
+logger = logging.getLogger("ROBOTY.parser")
 
 # ---- ОПИСАНИЕ СТРУКТУР ----
 @dataclass
@@ -26,7 +30,7 @@ class Scenario:
     operations: List[Operation]
 
 # ---- ПАРСЕР ВХОДА ----
-def parse_input(path: str) -> Scenario:
+def parse_input(path: str) -> Optional[Scenario]:
     """
     Загружает входной JSON-файл и возвращает объект Scenario.
     Формат JSON:
@@ -52,38 +56,98 @@ def parse_input(path: str) -> Scenario:
       ]
     }
     """
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        logger.info(f"Начинаем загрузку файла: {path}")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        logger.info(f"Файл {path} успешно загружен")
+    except json.JSONDecodeError as e:
+        logger.error(f"Ошибка разбора JSON в файле {path}: {e}")
+        raise ValueError(f"Некорректный формат JSON: {e}")
+    except OSError as e:
+        logger.error(f"Не удалось открыть файл {path}: {e}")
+        raise FileNotFoundError(f"Файл не найден или недоступен: {e}")
+    except Exception as e:
+        logger.error(f"Неожиданная ошибка при загрузке файла {path}: {e}")
+        raise
 
-    robots = [
-        Robot(
-            id=r["id"],
-            base_xyz=tuple(r["base_xyz"]),
-            joint_limits=[tuple(lim) for lim in r["joint_limits"]],
-            vmax=r["vmax"],
-            amax=r["amax"],
-            tool_clearance=r["tool_clearance"]
+    try:
+        # Валидация и парсинг роботов
+        if "robots" not in data:
+            raise ValueError("Отсутствует секция 'robots' в JSON")
+        
+        robots = []
+        for i, r in enumerate(data["robots"]):
+            try:
+                # Проверяем и нормализуем vmax и amax
+                vmax = r["vmax"]
+                amax = r["amax"]
+                
+                # Если это числа, преобразуем в списки
+                if isinstance(vmax, (int, float)):
+                    vmax = [float(vmax)] * 6
+                elif isinstance(vmax, list) and len(vmax) != 6:
+                    # Дополняем до 6 элементов если нужно
+                    while len(vmax) < 6:
+                        vmax.append(vmax[-1] if vmax else 1.0)
+                
+                if isinstance(amax, (int, float)):
+                    amax = [float(amax)] * 6
+                elif isinstance(amax, list) and len(amax) != 6:
+                    # Дополняем до 6 элементов если нужно
+                    while len(amax) < 6:
+                        amax.append(amax[-1] if amax else 2.0)
+                
+                robot = Robot(
+                    id=r["id"],
+                    base_xyz=tuple(r["base_xyz"]),
+                    joint_limits=[tuple(lim) for lim in r["joint_limits"]],
+                    vmax=vmax,
+                    amax=amax,
+                    tool_clearance=r["tool_clearance"]
+                )
+                robots.append(robot)
+                logger.debug(f"Робот {r['id']} успешно загружен")
+            except KeyError as e:
+                logger.error(f"Отсутствует обязательное поле {e} для робота {i}")
+                raise ValueError(f"Некорректные данные робота {i}: отсутствует поле {e}")
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке робота {i}: {e}")
+                raise
+
+        # Валидация и парсинг операций
+        if "operations" not in data:
+            raise ValueError("Отсутствует секция 'operations' в JSON")
+            
+        operations = []
+        for i, o in enumerate(data["operations"]):
+            try:
+                operation = Operation(
+                    id=o["id"],
+                    pick_xyz=tuple(o["pick_xyz"]),
+                    place_xyz=tuple(o["place_xyz"]),
+                    t_hold=o.get("t_hold", 0.0)
+                )
+                operations.append(operation)
+                logger.debug(f"Операция {o['id']} успешно загружена")
+            except KeyError as e:
+                logger.error(f"Отсутствует обязательное поле {e} для операции {i}")
+                raise ValueError(f"Некорректные данные операции {i}: отсутствует поле {e}")
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке операции {i}: {e}")
+                raise
+
+        safe_dist = data.get("safe_dist", 0.0)
+        logger.info(f"Загружено {len(robots)} роботов и {len(operations)} операций")
+
+        return Scenario(
+            robots=robots,
+            safe_dist=safe_dist,
+            operations=operations
         )
-        for r in data["robots"]
-    ]
-
-    operations = [
-        Operation(
-            id=o["id"],
-            pick_xyz=tuple(o["pick_xyz"]),
-            place_xyz=tuple(o["place_xyz"]),
-            t_hold=o["t_hold"] if "t_hold" in o else 0.0
-        )
-        for o in data["operations"]
-    ]
-
-    safe_dist = data["safe_dist"] if "safe_dist" in data else 0.0
-
-    return Scenario(
-        robots=robots,
-        safe_dist=safe_dist,
-        operations=operations
-    )
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге данных: {e}")
+        raise
 
 def parse_input_file(path):
     # Обертка для совместимости с импортом

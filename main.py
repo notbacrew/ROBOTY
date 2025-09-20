@@ -73,19 +73,21 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pushButton_save.clicked.connect(self.save_result)
         self.pushButton_clear_logs.clicked.connect(self.clear_logs)
         
-        # Кнопка генерации входных данных
+        # Подключение кнопки генерации входных данных
         try:
-            self.pushButton_input_gen = QtWidgets.QPushButton("📥 Генератор входных данных")
-            self.pushButton_input_gen.setObjectName("pushButton_input_gen")
-            self.pushButton_input_gen.setToolTip("Создать входной файл (JSON или TXT) и загрузить его")
-            if hasattr(self, 'horizontalLayout_file'):
-                self.horizontalLayout_file.insertWidget(1, self.pushButton_input_gen)
             self.pushButton_input_gen.clicked.connect(self.open_input_generator)
         except Exception as e:
-            self.logger.error(f"Не удалось инициализировать кнопку генератора входных данных: {e}")
+            self.logger.error(f"Не удалось подключить кнопку генератора входных данных: {e}")
         
         # Подключение сигналов для обновления интерфейса
         self.comboBox_assignment_method.currentTextChanged.connect(self.update_genetic_controls)
+        
+        # Подключение действий меню
+        self.actionLoad.triggered.connect(self.load_file)
+        self.actionSave.triggered.connect(self.save_result)
+        self.actionSaveAs.triggered.connect(self.save_result_as)
+        self.actionExit.triggered.connect(self.close)
+        self.actionAbout.triggered.connect(self.show_about)
         
         # Инициализация данных
         self.input_data = None
@@ -375,12 +377,101 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.textLog.append(f"🎨 Переключено на {new_theme.title()} тему")
         self.logger.info(f"Переключение темы: {self.current_theme} -> {new_theme}")
 
+    def save_result_as(self):
+        """Сохраняет результат с выбором имени файла"""
+        try:
+            if self.plan is None:
+                QtWidgets.QMessageBox.warning(self, "Предупреждение", "Нет данных для сохранения. Сначала запустите планирование.")
+                return
+            
+            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, 
+                "Сохранить результат планирования", 
+                "", 
+                "JSON файлы (*.json);;Все файлы (*)"
+            )
+            
+            if file_path:
+                import json
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.plan, f, indent=2, ensure_ascii=False)
+                
+                self.textLog.append(f"💾 Результат сохранен: {file_path}")
+                self.logger.info(f"Результат сохранен в файл: {file_path}")
+                
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл: {e}")
+            self.logger.error(f"Ошибка сохранения файла: {e}")
+
+    def show_about(self):
+        """Показывает диалог 'О программе'"""
+        try:
+            about_text = """
+            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                <h2 style="color: #2E8B57; margin-bottom: 20px;">🤖 ROBOTY v1.0.0</h2>
+                <h3 style="color: #4682B4; margin-bottom: 15px;">Система планирования траекторий многороботных систем</h3>
+                
+                <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
+                    <strong>Профессиональное решение</strong> для автоматического планирования траекторий 
+                    множественных роботов с проверкой коллизий и интерактивной визуализацией.
+                </p>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <h4 style="color: #2E8B57; margin-top: 0;">🚀 Основные возможности:</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>4 алгоритма назначения операций:</strong> Round Robin, Balanced, Distance Based, Genetic</li>
+                        <li><strong>Планирование траекторий:</strong> Трапецеидальный профиль скорости</li>
+                        <li><strong>Проверка коллизий:</strong> Между роботами и статическими препятствиями</li>
+                        <li><strong>3D/2D визуализация:</strong> Интерактивные графики с Plotly</li>
+                        <li><strong>Генератор данных:</strong> Создание входных файлов с настройками</li>
+                        <li><strong>Поддержка форматов:</strong> JSON и TXT</li>
+                    </ul>
+                </div>
+                
+                <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <h4 style="color: #4682B4; margin-top: 0;">⚙️ Технические особенности:</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>Архитектура:</strong> Модульная, расширяемая</li>
+                        <li><strong>Тестирование:</strong> 46 unit-тестов</li>
+                        <li><strong>UI/UX:</strong> Современный интерфейс с темами</li>
+                        <li><strong>Производительность:</strong> Оптимизированные алгоритмы</li>
+                        <li><strong>Надежность:</strong> Полная обработка ошибок</li>
+                    </ul>
+                </div>
+                
+                <div style="border-top: 2px solid #2E8B57; padding-top: 15px; margin-top: 20px;">
+                    <p style="margin: 5px 0;"><strong>👥 Разработчик:</strong> ROBOTY Team</p>
+                    <p style="margin: 5px 0;"><strong>📧 Email:</strong> roboty@example.com</p>
+                    <p style="margin: 5px 0;"><strong>🌐 GitHub:</strong> github.com/notbacrew/ROBOTY</p>
+                    <p style="margin: 5px 0;"><strong>📄 Лицензия:</strong> MIT License</p>
+                    <p style="margin: 5px 0;"><strong>🐍 Python:</strong> 3.8+</p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+                    <p>© 2025 ROBOTY Team. Все права защищены.</p>
+                    <p>Создано с ❤️ для робототехнического сообщества</p>
+                </div>
+            </div>
+            """
+            
+            QtWidgets.QMessageBox.about(self, "О программе ROBOTY", about_text)
+            self.logger.info("Открыто окно 'О программе'")
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка при показе диалога 'О программе': {e}")
+
     def open_input_generator(self):
         """Открывает окно генерации входных данных и при необходимости загружает файл"""
         try:
             dlg = InputGeneratorDialog(self)
-            # Сброс локального стиля, чтобы наследовать глобальную тему приложения
-            dlg.setStyleSheet("")
+            # Применяем текущую тему к диалогу
+            if hasattr(self, 'current_theme'):
+                if self.current_theme == 'dark':
+                    from ui_files.styles_final import get_dark_style
+                    dlg.setStyleSheet(get_dark_style())
+                else:
+                    from ui_files.styles_final import get_light_style
+                    dlg.setStyleSheet(get_light_style())
             if dlg.exec() == QtWidgets.QDialog.Accepted and getattr(dlg, 'saved_path', None):
                 path = dlg.saved_path
                 self.textLog.append(f"📥 Входной файл создан: {path}")
@@ -420,7 +511,8 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         # Добавляем контейнер в главный layout
         self.verticalLayout_main.addWidget(self.theme_container)
 
-if __name__ == "__main__":
+def main():
+    """Главная функция для запуска приложения"""
     try:
         app = QtWidgets.QApplication(sys.argv)
         app.setApplicationName("ROBOTY")
@@ -438,3 +530,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Критическая ошибка при запуске приложения: {e}")
         sys.exit(1)
+
+if __name__ == "__main__":
+    main()

@@ -26,7 +26,8 @@ from typing import List, Tuple, Optional
 logger = logging.getLogger("ROBOTY.parser_txt")
 
 class RobotConfig:
-    def __init__(self, base_xyz, joint_limits, vmax, amax, tool_clearance):
+    def __init__(self, base_xyz, joint_limits, vmax, amax, tool_clearance, robot_id=None):
+        self.id = robot_id if robot_id is not None else 1  # ID робота
         self.base_xyz = base_xyz
         self.joint_limits = joint_limits
         self.vmax = vmax
@@ -158,7 +159,8 @@ def parse_txt_input(path: str) -> Optional[ScenarioTxt]:
                 joint_limits=joint_limits,
                 vmax=vmax,
                 amax=amax,
-                tool_clearance=tool_clearance
+                tool_clearance=tool_clearance,
+                robot_id=i + 1  # ID робота (начиная с 1)
             ))
 
         logger.info(f"Успешно загружено {K} роботов и {N} операций из TXT файла")

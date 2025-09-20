@@ -153,18 +153,19 @@ class GeneticAlgorithm:
         for robot_ops in parent2.assignments:
             parent2_ops.update(robot_ops)
         
-        # Проверяем, что все операции присутствуют
+        # Проверяем, что все операции присутствуют в родителях
         all_ops = set(range(num_operations))
-        missing_ops = all_ops - parent1_ops
-        if missing_ops:
-            logger.warning(f"В родителе 1 отсутствуют операции: {missing_ops}")
-            for op in missing_ops:
+        missing_ops1 = all_ops - parent1_ops
+        missing_ops2 = all_ops - parent2_ops
+        
+        if missing_ops1:
+            logger.debug(f"В родителе 1 отсутствуют операции: {missing_ops1}")
+            for op in missing_ops1:
                 parent1.assignments[0].append(op)
         
-        missing_ops = all_ops - parent2_ops
-        if missing_ops:
-            logger.warning(f"В родителе 2 отсутствуют операции: {missing_ops}")
-            for op in missing_ops:
+        if missing_ops2:
+            logger.debug(f"В родителе 2 отсутствуют операции: {missing_ops2}")
+            for op in missing_ops2:
                 parent2.assignments[0].append(op)
         
         # Одноточечное скрещивание
@@ -177,6 +178,26 @@ class GeneticAlgorithm:
             else:
                 child1_assignments[i] = parent2.assignments[i].copy()
                 child2_assignments[i] = parent1.assignments[i].copy()
+        
+        # Проверяем, что все операции присутствуют в потомках
+        child1_ops = set()
+        child2_ops = set()
+        
+        for robot_ops in child1_assignments:
+            child1_ops.update(robot_ops)
+        
+        for robot_ops in child2_assignments:
+            child2_ops.update(robot_ops)
+        
+        # Добавляем недостающие операции
+        missing_ops1 = all_ops - child1_ops
+        missing_ops2 = all_ops - child2_ops
+        
+        for op in missing_ops1:
+            child1_assignments[0].append(op)
+        
+        for op in missing_ops2:
+            child2_assignments[0].append(op)
         
         child1 = GeneticIndividual(assignments=child1_assignments)
         child2 = GeneticIndividual(assignments=child2_assignments)

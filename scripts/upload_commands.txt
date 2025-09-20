@@ -1,0 +1,35 @@
+# Команды для загрузки проекта на GitHub
+
+# Инициализация Git репозитория
+git init
+
+# Добавление всех файлов
+git add .
+
+# Первый коммит
+git commit -m "Initial commit: ROBOTY - Система планирования траекторий роботов"
+
+# Добавление удаленного репозитория
+git remote add origin https://github.com/notbacrew/ROBOTY.git
+
+# Переименование основной ветки
+git branch -M main
+
+# Загрузка на GitHub
+git push -u origin main
+
+# Обновление после изменений
+git add .
+git commit -m "Update: исправления и улучшения"
+git push origin main
+
+# Создание новой ветки для функций
+git checkout -b feature/new-feature
+git add .
+git commit -m "Add: новая функция"
+git push origin feature/new-feature
+
+# Слияние с основной веткой
+git checkout main
+git merge feature/new-feature
+git push origin main

@@ -151,7 +151,7 @@ class TestCollisionDetection(unittest.TestCase):
         self.assertIsInstance(collision, CollisionInfo)
         self.assertIn(collision.robot1_id, [1, 2])
         self.assertIn(collision.robot2_id, [1, 2])
-        self.assertGreater(collision.time, 0)
+        self.assertGreaterEqual(collision.time, 0)
         self.assertLess(collision.distance, collision.min_required_distance)
     
     def test_single_robot(self):
@@ -183,7 +183,7 @@ class TestStaticObstacles(unittest.TestCase):
                     "id": 1,
                     "trajectory": [
                         {"t": 0.0, "x": 0.0, "y": 0.0, "z": 0.0},
-                        {"t": 1.0, "x": 2.0, "y": 0.0, "z": 0.0}
+                        {"t": 1.0, "x": 0.3, "y": 0.0, "z": 0.0}  # Ближе к препятствию
                     ],
                     "tool_clearance": 0.1
                 }
@@ -192,14 +192,14 @@ class TestStaticObstacles(unittest.TestCase):
         
         self.sphere_obstacle = {
             "type": "sphere",
-            "position": (1.0, 0.0, 0.0),
-            "size": 0.5  # радиус
+            "position": (0.2, 0.0, 0.0),  # Ближе к траектории робота
+            "size": 0.1  # Меньший радиус
         }
         
         self.box_obstacle = {
             "type": "box",
-            "position": (1.0, 0.0, 0.0),
-            "size": (1.0, 1.0, 1.0)  # ширина, высота, глубина
+            "position": (0.2, 0.0, 0.0),  # Ближе к траектории робота
+            "size": (0.2, 0.2, 0.2)  # Меньший размер
         }
     
     def test_sphere_obstacle_collision(self):

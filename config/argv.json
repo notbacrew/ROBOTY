@@ -1,0 +1,21 @@
+{
+  "input_file": "data/test_scenario_simple.json",
+  "output_file": "outputs/results/result.txt",
+  "visualization_file": "outputs/visualizations/visualization.html",
+  "assignment_method": "balanced",
+  "optimize_trajectories": true,
+  "path_planning": false,
+  "genetic_population_size": 50,
+  "genetic_generations": 100,
+  "log_level": "INFO",
+  "safe_distance": 0.3,
+  "tool_clearance": 0.1,
+  "max_velocity": 1.0,
+  "max_acceleration": 2.0,
+  "time_step": 0.1,
+  "collision_check": true,
+  "visualization_3d": true,
+  "export_html": true,
+  "verbose": true,
+  "debug": false
+}

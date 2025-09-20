@@ -1,15 +1,6 @@
 # -*- coding: utf-8 -*-
-
-################################################################################
-## Form generated from reading UI file 'main_window_improved.ui'
-##
-## Created by: Qt User Interface Compiler version 6.9.2
-##
-## WARNING! All changes made in this file will be lost when recompiling UI file!
-################################################################################
-
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
+    QMetaObject, QPoint, QRect,
     QSize, QTime, QUrl, Qt)
 from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
@@ -19,38 +10,69 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGroupBox,
     QGridLayout, QHBoxLayout, QLabel, QMainWindow, QMenu,
     QMenuBar, QPushButton, QSizePolicy, QSpacerItem,
     QSpinBox, QStatusBar, QTextEdit, QVBoxLayout,
-    QWidget)
+    QWidget, QSplitter)
 from PySide6.QtGui import QAction
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(800, 600)
+        MainWindow.resize(1200, 800)  # Увеличил размер для лучшего размещения
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
+        
+        # Главный вертикальный layout
         self.verticalLayout_main = QVBoxLayout(self.centralwidget)
         self.verticalLayout_main.setObjectName(u"verticalLayout_main")
+        self.verticalLayout_main.setContentsMargins(10, 10, 10, 10)  # Отступы от краев
+        self.verticalLayout_main.setSpacing(15)  # Расстояние между группами
         
         # Группа для работы с файлами
         self.groupBox_file = QGroupBox(self.centralwidget)
         self.groupBox_file.setObjectName(u"groupBox_file")
         self.groupBox_file.setTitle("📁 Работа с файлами")
+        self.groupBox_file.setMaximumHeight(80)  # Ограничиваем высоту
         self.horizontalLayout_file = QHBoxLayout(self.groupBox_file)
         self.horizontalLayout_file.setObjectName(u"horizontalLayout_file")
+        self.horizontalLayout_file.setContentsMargins(15, 10, 15, 10)
+        self.horizontalLayout_file.setSpacing(10)
         
+        # Основные кнопки файлов
         self.pushButton_load = QPushButton(self.groupBox_file)
         self.pushButton_load.setObjectName(u"pushButton_load")
         self.pushButton_load.setText("📂 Загрузить файл")
+        self.pushButton_load.setMinimumHeight(35)
         self.horizontalLayout_file.addWidget(self.pushButton_load)
         
         self.pushButton_save = QPushButton(self.groupBox_file)
         self.pushButton_save.setObjectName(u"pushButton_save")
         self.pushButton_save.setText("💾 Сохранить результат")
+        self.pushButton_save.setMinimumHeight(35)
         self.horizontalLayout_file.addWidget(self.pushButton_save)
         
+        # Отступ
         self.horizontalSpacer_file = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.horizontalLayout_file.addItem(self.horizontalSpacer_file)
+        
+        # Генератор входных данных
+        self.pushButton_input_gen = QPushButton(self.groupBox_file)
+        self.pushButton_input_gen.setObjectName(u"pushButton_input_gen")
+        self.pushButton_input_gen.setText("📥 Генератор входных данных")
+        self.pushButton_input_gen.setToolTip("Создать входной файл (JSON или TXT) и загрузить его")
+        self.pushButton_input_gen.setMinimumHeight(35)
+        self.pushButton_input_gen.setStyleSheet("""
+            QPushButton {
+                background-color: #9B30FF;
+                color: white;
+                font-weight: bold;
+                padding: 8px 16px;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #6A0DAD;
+            }
+        """)
+        self.horizontalLayout_file.addWidget(self.pushButton_input_gen)
         
         self.verticalLayout_main.addWidget(self.groupBox_file)
         
@@ -58,10 +80,13 @@ class Ui_MainWindow(object):
         self.groupBox_algorithm = QGroupBox(self.centralwidget)
         self.groupBox_algorithm.setObjectName(u"groupBox_algorithm")
         self.groupBox_algorithm.setTitle("🧠 Алгоритмы и настройки")
+        self.groupBox_algorithm.setMaximumHeight(200)  # Ограничиваем высоту
         self.gridLayout_algorithm = QGridLayout(self.groupBox_algorithm)
         self.gridLayout_algorithm.setObjectName(u"gridLayout_algorithm")
+        self.gridLayout_algorithm.setContentsMargins(15, 15, 15, 15)
+        self.gridLayout_algorithm.setSpacing(10)
         
-        # Метод назначения операций
+        # Первая строка: Метод назначения операций
         self.label_assignment_method = QLabel(self.groupBox_algorithm)
         self.label_assignment_method.setObjectName(u"label_assignment_method")
         self.label_assignment_method.setText("Метод назначения операций:")
@@ -75,13 +100,13 @@ class Ui_MainWindow(object):
             "Distance Based (по расстоянию)",
             "Genetic Algorithm (генетический)"
         ])
-        self.comboBox_assignment_method.setCurrentIndex(1)  # По умолчанию Balanced
+        self.comboBox_assignment_method.setCurrentIndex(1)
         self.gridLayout_algorithm.addWidget(self.comboBox_assignment_method, 0, 1, 1, 1)
         
-        # Настройки генетического алгоритма
+        # Вторая строка: Настройки генетического алгоритма
         self.label_genetic_population = QLabel(self.groupBox_algorithm)
         self.label_genetic_population.setObjectName(u"label_genetic_population")
-        self.label_genetic_population.setText("Размер популяции (генетический):")
+        self.label_genetic_population.setText("Размер популяции:")
         self.gridLayout_algorithm.addWidget(self.label_genetic_population, 1, 0, 1, 1)
         
         self.spinBox_population_size = QSpinBox(self.groupBox_algorithm)
@@ -91,9 +116,10 @@ class Ui_MainWindow(object):
         self.spinBox_population_size.setValue(50)
         self.gridLayout_algorithm.addWidget(self.spinBox_population_size, 1, 1, 1, 1)
         
+        # Третья строка: Количество поколений
         self.label_genetic_generations = QLabel(self.groupBox_algorithm)
         self.label_genetic_generations.setObjectName(u"label_genetic_generations")
-        self.label_genetic_generations.setText("Количество поколений (генетический):")
+        self.label_genetic_generations.setText("Количество поколений:")
         self.gridLayout_algorithm.addWidget(self.label_genetic_generations, 2, 0, 1, 1)
         
         self.spinBox_generations = QSpinBox(self.groupBox_algorithm)
@@ -103,7 +129,7 @@ class Ui_MainWindow(object):
         self.spinBox_generations.setValue(100)
         self.gridLayout_algorithm.addWidget(self.spinBox_generations, 2, 1, 1, 1)
         
-        # Дополнительные опции
+        # Четвертая строка: Дополнительные опции
         self.checkBox_optimize_trajectories = QCheckBox(self.groupBox_algorithm)
         self.checkBox_optimize_trajectories.setObjectName(u"checkBox_optimize_trajectories")
         self.checkBox_optimize_trajectories.setText("Оптимизация траекторий")
@@ -121,40 +147,76 @@ class Ui_MainWindow(object):
         self.groupBox_control = QGroupBox(self.centralwidget)
         self.groupBox_control.setObjectName(u"groupBox_control")
         self.groupBox_control.setTitle("🎮 Выполнение")
+        self.groupBox_control.setMaximumHeight(80)  # Ограничиваем высоту
         self.horizontalLayout_control = QHBoxLayout(self.groupBox_control)
         self.horizontalLayout_control.setObjectName(u"horizontalLayout_control")
+        self.horizontalLayout_control.setContentsMargins(15, 10, 15, 10)
+        self.horizontalLayout_control.setSpacing(10)
         
+        # Главная кнопка запуска
         self.pushButton_run = QPushButton(self.groupBox_control)
         self.pushButton_run.setObjectName(u"pushButton_run")
         self.pushButton_run.setText("🚀 Запустить планирование")
+        self.pushButton_run.setMinimumHeight(40)
+        self.pushButton_run.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
         self.horizontalLayout_control.addWidget(self.pushButton_run)
         
+        # Кнопка визуализации
         self.pushButton_viz = QPushButton(self.groupBox_control)
         self.pushButton_viz.setObjectName(u"pushButton_viz")
         self.pushButton_viz.setText("📊 Открыть визуализацию")
+        self.pushButton_viz.setMinimumHeight(35)
         self.horizontalLayout_control.addWidget(self.pushButton_viz)
         
-        self.pushButton_clear_logs = QPushButton(self.groupBox_control)
-        self.pushButton_clear_logs.setObjectName(u"pushButton_clear_logs")
-        self.pushButton_clear_logs.setText("🗑️ Очистить")
-        self.horizontalLayout_control.addWidget(self.pushButton_clear_logs)
-        
+        # Отступ
         self.horizontalSpacer_control = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.horizontalLayout_control.addItem(self.horizontalSpacer_control)
         
+        # Кнопка очистки
+        self.pushButton_clear_logs = QPushButton(self.groupBox_control)
+        self.pushButton_clear_logs.setObjectName(u"pushButton_clear_logs")
+        self.pushButton_clear_logs.setText("🗑️ Очистить")
+        self.pushButton_clear_logs.setMinimumHeight(35)
+        self.pushButton_clear_logs.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+        """)
+        self.horizontalLayout_control.addWidget(self.pushButton_clear_logs)
+        
         self.verticalLayout_main.addWidget(self.groupBox_control)
         
-        # Группа логов
+        # Группа логов - растягивается на оставшееся место
         self.groupBox_logs = QGroupBox(self.centralwidget)
         self.groupBox_logs.setObjectName(u"groupBox_logs")
         self.groupBox_logs.setTitle("📋 Логи и результаты")
+        self.groupBox_logs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.verticalLayout_logs = QVBoxLayout(self.groupBox_logs)
         self.verticalLayout_logs.setObjectName(u"verticalLayout_logs")
+        self.verticalLayout_logs.setContentsMargins(15, 15, 15, 15)
         
         self.textLog = QTextEdit(self.groupBox_logs)
         self.textLog.setObjectName(u"textLog")
         self.textLog.setReadOnly(True)
         self.textLog.setPlaceholderText("Логи работы программы будут отображаться здесь...")
+        self.textLog.setMinimumHeight(300)  # Минимальная высота
         self.verticalLayout_logs.addWidget(self.textLog)
         
         self.verticalLayout_main.addWidget(self.groupBox_logs)
@@ -164,7 +226,7 @@ class Ui_MainWindow(object):
         # Меню
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 800, 22))
+        self.menubar.setGeometry(QRect(0, 0, 1200, 22))
         
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")

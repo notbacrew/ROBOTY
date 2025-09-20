@@ -158,49 +158,61 @@ def get_light_style():
     }}
     
     QSpinBox::up-button, QDoubleSpinBox::up-button {{
-        background-color: #F0F0F0;
-        border: 1px solid #C0C0C0;
-        border-radius: 0px;
-        width: 16px;
-        height: 12px;
+        background-color: {COLORS['light']['primary']};
+        border: 2px solid {COLORS['light']['primary']};
+        border-radius: 4px;
+        width: 20px;
+        height: 16px;
+        margin: 1px;
     }}
     
     QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
-        background-color: #E0E0E0;
-        border-color: #A0A0A0;
+        background-color: {COLORS['light']['secondary']};
+        border-color: {COLORS['light']['secondary']};
+    }}
+    
+    QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {{
+        background-color: {COLORS['light']['primary']};
+        border-color: {COLORS['light']['primary']};
     }}
     
     QSpinBox::down-button, QDoubleSpinBox::down-button {{
-        background-color: #F0F0F0;
-        border: 1px solid #C0C0C0;
-        border-radius: 0px;
-        width: 16px;
-        height: 12px;
+        background-color: {COLORS['light']['primary']};
+        border: 2px solid {COLORS['light']['primary']};
+        border-radius: 4px;
+        width: 20px;
+        height: 16px;
+        margin: 1px;
     }}
     
     QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-        background-color: #E0E0E0;
-        border-color: #A0A0A0;
+        background-color: {COLORS['light']['secondary']};
+        border-color: {COLORS['light']['secondary']};
+    }}
+    
+    QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
+        background-color: {COLORS['light']['primary']};
+        border-color: {COLORS['light']['primary']};
     }}
     
     QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-        color: #000000;
-        width: 6px;
-        height: 6px;
-        border-left: 3px solid transparent;
-        border-right: 3px solid transparent;
-        border-bottom: 6px solid #000000;
+        color: white;
+        width: 8px;
+        height: 8px;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-bottom: 8px solid white;
         background: none;
         image: none;
     }}
     
     QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-        color: #000000;
-        width: 6px;
-        height: 6px;
-        border-left: 3px solid transparent;
-        border-right: 3px solid transparent;
-        border-top: 6px solid #000000;
+        color: white;
+        width: 8px;
+        height: 8px;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 8px solid white;
         background: none;
         image: none;
     }}
@@ -333,6 +345,25 @@ def get_light_style():
     QDialog QPushButton[class="secondary"]:hover {{
         background-color: {COLORS['light']['hover']};
     }}
+    
+    /* Дополнительные стили для улучшения видимости кнопок со стрелками */
+    QSpinBox::up-button:disabled, QDoubleSpinBox::up-button:disabled {{
+        background-color: {COLORS['light']['text_disabled']};
+        border-color: {COLORS['light']['text_disabled']};
+    }}
+    
+    QSpinBox::down-button:disabled, QDoubleSpinBox::down-button:disabled {{
+        background-color: {COLORS['light']['text_disabled']};
+        border-color: {COLORS['light']['text_disabled']};
+    }}
+    
+    QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{
+        border-bottom-color: {COLORS['light']['background']};
+    }}
+    
+    QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
+        border-top-color: {COLORS['light']['background']};
+    }}
     """
 
 def get_dark_style():
@@ -456,49 +487,61 @@ def get_dark_style():
     }}
     
     QSpinBox::up-button, QDoubleSpinBox::up-button {{
-        background-color: #404040;
-        border: 1px solid #606060;
-        border-radius: 0px;
-        width: 16px;
-        height: 12px;
+        background-color: {COLORS['dark']['primary']};
+        border: 2px solid {COLORS['dark']['primary']};
+        border-radius: 4px;
+        width: 20px;
+        height: 16px;
+        margin: 1px;
     }}
     
     QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
-        background-color: #505050;
-        border-color: #707070;
+        background-color: {COLORS['dark']['secondary']};
+        border-color: {COLORS['dark']['secondary']};
+    }}
+    
+    QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {{
+        background-color: {COLORS['dark']['primary']};
+        border-color: {COLORS['dark']['primary']};
     }}
     
     QSpinBox::down-button, QDoubleSpinBox::down-button {{
-        background-color: #404040;
-        border: 1px solid #606060;
-        border-radius: 0px;
-        width: 16px;
-        height: 12px;
+        background-color: {COLORS['dark']['primary']};
+        border: 2px solid {COLORS['dark']['primary']};
+        border-radius: 4px;
+        width: 20px;
+        height: 16px;
+        margin: 1px;
     }}
     
     QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-        background-color: #505050;
-        border-color: #707070;
+        background-color: {COLORS['dark']['secondary']};
+        border-color: {COLORS['dark']['secondary']};
+    }}
+    
+    QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
+        background-color: {COLORS['dark']['primary']};
+        border-color: {COLORS['dark']['primary']};
     }}
     
     QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-        color: #FFFFFF;
-        width: 6px;
-        height: 6px;
-        border-left: 3px solid transparent;
-        border-right: 3px solid transparent;
-        border-bottom: 6px solid #FFFFFF;
+        color: white;
+        width: 8px;
+        height: 8px;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-bottom: 8px solid white;
         background: none;
         image: none;
     }}
     
     QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-        color: #FFFFFF;
-        width: 6px;
-        height: 6px;
-        border-left: 3px solid transparent;
-        border-right: 3px solid transparent;
-        border-top: 6px solid #FFFFFF;
+        color: white;
+        width: 8px;
+        height: 8px;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 8px solid white;
         background: none;
         image: none;
     }}
@@ -630,6 +673,25 @@ def get_dark_style():
     
     QDialog QPushButton[class="secondary"]:hover {{
         background-color: {COLORS['dark']['hover']};
+    }}
+    
+    /* Дополнительные стили для улучшения видимости кнопок со стрелками */
+    QSpinBox::up-button:disabled, QDoubleSpinBox::up-button:disabled {{
+        background-color: {COLORS['dark']['text_disabled']};
+        border-color: {COLORS['dark']['text_disabled']};
+    }}
+    
+    QSpinBox::down-button:disabled, QDoubleSpinBox::down-button:disabled {{
+        background-color: {COLORS['dark']['text_disabled']};
+        border-color: {COLORS['dark']['text_disabled']};
+    }}
+    
+    QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{
+        border-bottom-color: {COLORS['dark']['background']};
+    }}
+    
+    QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
+        border-top-color: {COLORS['dark']['background']};
     }}
     """
 

@@ -1,6 +1,0 @@
-PySide6
-numpy
-scipy
-matplotlib
-plotly
-pandas

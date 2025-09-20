@@ -149,9 +149,14 @@ def parse_input(path: str) -> Optional[Scenario]:
         logger.error(f"Ошибка при парсинге данных: {e}")
         raise
 
-def parse_input_file(path):
-    # Обертка для совместимости с импортом
-    return parse_input(path)
+def parse_input_file(path: str):
+    """Определяет формат по расширению и вызывает соответствующий парсер."""
+    lower = path.lower()
+    if lower.endswith('.txt'):
+        from core.parser_txt import parse_txt_input
+        return parse_txt_input(path)
+    else:
+        return parse_input(path)
 
 # ---- ЗАПИСЬ РЕЗУЛЬТАТА ----
 def save_output(path: str, schedule: dict):

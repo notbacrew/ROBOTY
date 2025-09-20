@@ -4,6 +4,7 @@ import logging
 import os
 from datetime import datetime
 from ui_files.main_window_improved import Ui_MainWindow
+from ui_files.input_generator_dialog import InputGeneratorDialog
 from ui_files.styles_final import get_light_style, get_dark_style, get_colors
 from core.parser import parse_input_file
 from core.planner import run_planner_algorithm
@@ -71,6 +72,17 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pushButton_viz.clicked.connect(self.open_visualizer)
         self.pushButton_save.clicked.connect(self.save_result)
         self.pushButton_clear_logs.clicked.connect(self.clear_logs)
+        
+        # Кнопка генерации входных данных
+        try:
+            self.pushButton_input_gen = QtWidgets.QPushButton("📥 Генератор входных данных")
+            self.pushButton_input_gen.setObjectName("pushButton_input_gen")
+            self.pushButton_input_gen.setToolTip("Создать входной файл (JSON или TXT) и загрузить его")
+            if hasattr(self, 'horizontalLayout_file'):
+                self.horizontalLayout_file.insertWidget(1, self.pushButton_input_gen)
+            self.pushButton_input_gen.clicked.connect(self.open_input_generator)
+        except Exception as e:
+            self.logger.error(f"Не удалось инициализировать кнопку генератора входных данных: {e}")
         
         # Подключение сигналов для обновления интерфейса
         self.comboBox_assignment_method.currentTextChanged.connect(self.update_genetic_controls)
@@ -320,20 +332,29 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         }
 
     def apply_theme(self, theme_name):
-        """Применяет указанную тему к приложению"""
+        """Применяет указанную тему глобально ко всему приложению (включая диалоги)"""
         try:
             if theme_name == 'light':
                 style = get_light_style()
-                self.setStyleSheet(style)
                 self.current_theme = 'light'
             elif theme_name == 'dark':
                 style = get_dark_style()
-                self.setStyleSheet(style)
                 self.current_theme = 'dark'
+            else:
+                style = get_light_style()
+                self.current_theme = 'light'
+
+            # Применяем стили ко всему приложению, чтобы все окна/диалоги синхронизировались
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.setStyleSheet(style)
+            else:
+                # fallback: применить к окну
+                self.setStyleSheet(style)
             
             # Обновляем иконку переключателя темы если есть
             if hasattr(self, 'pushButton_theme_toggle'):
-                if theme_name == 'light':
+                if self.current_theme == 'light':
                     self.pushButton_theme_toggle.setText("🌙")
                     self.pushButton_theme_toggle.setToolTip("Переключить на темную тему")
                 else:
@@ -353,6 +374,33 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         # Обновляем лог
         self.textLog.append(f"🎨 Переключено на {new_theme.title()} тему")
         self.logger.info(f"Переключение темы: {self.current_theme} -> {new_theme}")
+
+    def open_input_generator(self):
+        """Открывает окно генерации входных данных и при необходимости загружает файл"""
+        try:
+            dlg = InputGeneratorDialog(self)
+            # Сброс локального стиля, чтобы наследовать глобальную тему приложения
+            dlg.setStyleSheet("")
+            if dlg.exec() == QtWidgets.QDialog.Accepted and getattr(dlg, 'saved_path', None):
+                path = dlg.saved_path
+                self.textLog.append(f"📥 Входной файл создан: {path}")
+                self.logger.info(f"Создан входной файл: {path}")
+                if getattr(dlg, 'load_into_app', False):
+                    try:
+                        self.input_data = parse_input_file(path)
+                        self.textLog.append("✅ Входные данные загружены в приложение.")
+                        if hasattr(self.input_data, 'robots'):
+                            self.textLog.append(f"Загружено роботов: {len(self.input_data.robots)}")
+                        if hasattr(self.input_data, 'operations'):
+                            self.textLog.append(f"Загружено операций: {len(self.input_data.operations)}")
+                    except Exception as e:
+                        error_msg = f"Ошибка загрузки входного файла: {e}"
+                        self.textLog.append(error_msg)
+                        self.logger.error(error_msg, exc_info=True)
+        except Exception as e:
+            error_msg = f"Ошибка генератора входных данных: {e}"
+            self.textLog.append(error_msg)
+            self.logger.error(error_msg, exc_info=True)
 
     def setup_theme_toggle(self):
         """Настраивает переключатель темы"""

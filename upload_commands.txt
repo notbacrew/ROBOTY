@@ -1,0 +1,26 @@
+# Команды для загрузки проекта в репозиторий notbacrew/ROBOTY
+
+# 1. Настройка Git (замените на ваши данные)
+git config --global user.name "Ваше Имя"
+git config --global user.email "ваш.email@example.com"
+
+# 2. Инициализация репозитория
+git init
+
+# 3. Добавление всех файлов
+git add .
+
+# 4. Первый коммит
+git commit -m "Initial commit: Complete ROBOTY multi-robot trajectory planning system"
+
+# 5. Подключение к удаленному репозиторию
+git remote add origin https://github.com/notbacrew/ROBOTY.git
+
+# 6. Переименование ветки в main (если нужно)
+git branch -M main
+
+# 7. Загрузка в репозиторий
+git push -u origin main
+
+# Если возникнет конфликт с существующими файлами, используйте:
+# git push -u origin main --force

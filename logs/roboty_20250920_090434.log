@@ -1,0 +1,54 @@
+2025-09-20 09:04:34 - ROBOTY.main - INFO - Запуск приложения ROBOTY
+2025-09-20 09:04:34 - ROBOTY.main - INFO - Интерфейс инициализирован
+2025-09-20 09:04:34 - ROBOTY.main - INFO - Приложение успешно запущено
+2025-09-20 09:04:37 - ROBOTY.main - INFO - Начинаем загрузку файла
+2025-09-20 09:05:12 - ROBOTY.main - INFO - Загружаем файл: //edu.local/public/studenthomes/22200847/Desktop/ROBOTY-main/ROBOTY/data/example_schedule.json
+2025-09-20 09:05:12 - ROBOTY.parser - INFO - Начинаем загрузку файла: //edu.local/public/studenthomes/22200847/Desktop/ROBOTY-main/ROBOTY/data/example_schedule.json
+2025-09-20 09:05:12 - ROBOTY.parser - INFO - Файл //edu.local/public/studenthomes/22200847/Desktop/ROBOTY-main/ROBOTY/data/example_schedule.json успешно загружен
+2025-09-20 09:05:12 - ROBOTY.parser - DEBUG - Робот 1 успешно загружен
+2025-09-20 09:05:12 - ROBOTY.parser - DEBUG - Робот 2 успешно загружен
+2025-09-20 09:05:12 - ROBOTY.parser - DEBUG - Операция 101 успешно загружена
+2025-09-20 09:05:12 - ROBOTY.parser - DEBUG - Операция 102 успешно загружена
+2025-09-20 09:05:12 - ROBOTY.parser - INFO - Загружено 2 роботов и 2 операций
+2025-09-20 09:05:12 - ROBOTY.main - INFO - Файл успешно загружен и распарсен
+2025-09-20 09:05:14 - ROBOTY.main - INFO - Запуск планировщика
+2025-09-20 09:05:14 - ROBOTY.planner - INFO - Запуск планировщика траекторий
+2025-09-20 09:05:14 - ROBOTY.assigner - INFO - Начинаем назначение операций методом: balanced
+2025-09-20 09:05:14 - ROBOTY.planner - ERROR - Ошибка в планировщике: 'float' object is not iterable
+2025-09-20 09:05:14 - ROBOTY.main - ERROR - Ошибка планировщика: 'float' object is not iterable
+Traceback (most recent call last):
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\main.py", line 166, in run_planner
+    self.plan = run_planner_algorithm(self.input_data)
+                ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\planner.py", line 175, in run_planner_algorithm
+    assignments = assign_operations(input_data, assignment_method)
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\assigner.py", line 119, in assign_operations
+    return assign_operations_balanced(scenario)
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\assigner.py", line 57, in assign_operations_balanced
+    cost = calculate_operation_cost(robot, op)
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\assigner.py", line 24, in calculate_operation_cost
+    max_speed = min(robot.vmax) if robot.vmax else 1.0
+                ~~~^^^^^^^^^^^^
+TypeError: 'float' object is not iterable
+2025-09-20 09:05:15 - ROBOTY.main - INFO - Открытие визуализатора
+2025-09-20 09:05:15 - ROBOTY.main - WARNING - Попытка визуализации без плана
+2025-09-20 09:05:19 - ROBOTY.main - WARNING - Попытка сохранения без плана
+2025-09-20 09:05:22 - ROBOTY.main - INFO - Запуск планировщика
+2025-09-20 09:05:22 - ROBOTY.planner - INFO - Запуск планировщика траекторий
+2025-09-20 09:05:22 - ROBOTY.assigner - INFO - Начинаем назначение операций методом: balanced
+2025-09-20 09:05:22 - ROBOTY.planner - ERROR - Ошибка в планировщике: 'float' object is not iterable
+2025-09-20 09:05:22 - ROBOTY.main - ERROR - Ошибка планировщика: 'float' object is not iterable
+Traceback (most recent call last):
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\main.py", line 166, in run_planner
+    self.plan = run_planner_algorithm(self.input_data)
+                ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\planner.py", line 175, in run_planner_algorithm
+    assignments = assign_operations(input_data, assignment_method)
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\assigner.py", line 119, in assign_operations
+    return assign_operations_balanced(scenario)
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\assigner.py", line 57, in assign_operations_balanced
+    cost = calculate_operation_cost(robot, op)
+  File "\\edu.local\public\studenthomes\22200847\Desktop\ROBOTY-main\ROBOTY\core\assigner.py", line 24, in calculate_operation_cost
+    max_speed = min(robot.vmax) if robot.vmax else 1.0
+                ~~~^^^^^^^^^^^^
+TypeError: 'float' object is not iterable

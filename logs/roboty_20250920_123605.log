@@ -1,0 +1,70 @@
+2025-09-20 12:36:05 - ROBOTY.main - INFO - Запуск приложения ROBOTY
+2025-09-20 12:36:05 - ROBOTY.main - INFO - Интерфейс инициализирован
+2025-09-20 12:36:06 - ROBOTY.main - INFO - Приложение успешно запущено
+2025-09-20 12:36:14 - ROBOTY.main - INFO - Начинаем загрузку файла
+2025-09-20 12:36:16 - ROBOTY.main - INFO - Загружаем файл: C:/Users/22200490/.cursor/ROBOTY/ROBOTY/data/example_schedule2.json
+2025-09-20 12:36:16 - ROBOTY.parser - INFO - Начинаем загрузку файла: C:/Users/22200490/.cursor/ROBOTY/ROBOTY/data/example_schedule2.json
+2025-09-20 12:36:17 - ROBOTY.parser - INFO - Файл C:/Users/22200490/.cursor/ROBOTY/ROBOTY/data/example_schedule2.json успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 1 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 2 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 3 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 4 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 5 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 6 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 7 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 8 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 9 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Робот 10 успешно загружен
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Операция 101 успешно загружена
+2025-09-20 12:36:17 - ROBOTY.parser - DEBUG - Операция 102 успешно загружена
+2025-09-20 12:36:17 - ROBOTY.parser - INFO - Загружено 10 роботов и 2 операций
+2025-09-20 12:36:17 - ROBOTY.main - INFO - Файл успешно загружен и распарсен
+2025-09-20 12:36:21 - ROBOTY.main - INFO - Метод назначения изменен на: genetic
+2025-09-20 12:36:24 - ROBOTY.main - INFO - Оптимизация траекторий: включено
+2025-09-20 12:36:29 - ROBOTY.main - INFO - Запуск планировщика
+2025-09-20 12:36:29 - ROBOTY.planner - INFO - Запуск планировщика траекторий
+2025-09-20 12:36:29 - ROBOTY.assigner - INFO - Начинаем назначение операций методом: genetic
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Инициализирован генетический алгоритм: популяция=50, поколения=100
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Начинаем эволюцию генетического алгоритма
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 0: лучшая приспособленность = 0.362365, makespan = 2.73
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 10: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 20: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 30: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 40: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 50: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 60: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 70: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 80: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Поколение 90: лучшая приспособленность = 0.396000, makespan = 2.50
+2025-09-20 12:36:29 - ROBOTY.genetic_algorithm - INFO - Эволюция завершена. Лучший makespan: 2.50
+2025-09-20 12:36:29 - ROBOTY.planner - INFO - Операции назначены методом: genetic
+2025-09-20 12:36:29 - ROBOTY.planner - DEBUG - Планирование траектории для робота 1 с 0 операциями
+2025-09-20 12:36:29 - ROBOTY.planner - WARNING - Нет операций для планирования траектории
+2025-09-20 12:36:29 - ROBOTY.planner - DEBUG - Планирование траектории для робота 2 с 1 операциями
+2025-09-20 12:36:29 - ROBOTY.planner - DEBUG - Планирование траектории для робота с 1 операциями
+2025-09-20 12:36:29 - ROBOTY.planner - DEBUG - Операция 1 запланирована, время завершения: 2.98
+2025-09-20 12:36:29 - ROBOTY.planner - INFO - Траектория робота запланирована, общее время: 2.98
+2025-09-20 12:36:29 - ROBOTY.planner - DEBUG - Оптимизируем траекторию для робота 2
+2025-09-20 12:36:29 - ROBOTY.trajectory_optimizer - INFO - Инициализирован B-сплайн оптимизатор: степень=3
+2025-09-20 12:36:29 - ROBOTY.trajectory_optimizer - INFO - Инициализирован сглаживатель траекторий: фактор=0.5
+2025-09-20 12:36:29 - ROBOTY.trajectory_optimizer - INFO - Инициализирован оптимизатор траекторий: метод=bspline
+2025-09-20 12:36:29 - ROBOTY.trajectory_optimizer - INFO - Оптимизация траектории методом bspline
+2025-09-20 12:36:29 - ROBOTY.trajectory_optimizer - INFO - Оптимизация траектории с 12 точек до 100 точек
+2025-09-20 12:36:29 - ROBOTY.planner - ERROR - Ошибка в планировщике: list index out of range
+2025-09-20 12:36:29 - ROBOTY.main - ERROR - Ошибка планировщика: list index out of range
+Traceback (most recent call last):
+  File "main.py", line 255, in run_planner
+    optimization_method=self.optimization_method
+  File "C:\Users\22200490\.cursor\ROBOTY\ROBOTY\core\planner.py", line 241, in run_planner_algorithm
+    optimized_positions = optimize_trajectory(positions, method=optimization_method)
+  File "C:\Users\22200490\.cursor\ROBOTY\ROBOTY\core\trajectory_optimizer.py", line 424, in optimize_trajectory
+    return optimizer.optimize_trajectory(waypoints, **kwargs)
+  File "C:\Users\22200490\.cursor\ROBOTY\ROBOTY\core\trajectory_optimizer.py", line 349, in optimize_trajectory
+    return self.bspline_optimizer.optimize_trajectory(waypoints, num_points)
+  File "C:\Users\22200490\.cursor\ROBOTY\ROBOTY\core\trajectory_optimizer.py", line 170, in optimize_trajectory
+    point = self.evaluate_bspline(control_points, t)
+  File "C:\Users\22200490\.cursor\ROBOTY\ROBOTY\core\trajectory_optimizer.py", line 135, in evaluate_bspline
+    basis = self.basis_function(i, k, t, knots)
+  File "C:\Users\22200490\.cursor\ROBOTY\ROBOTY\core\trajectory_optimizer.py", line 85, in basis_function
+    if knots[i + k + 1] != knots[i + 1]:
+IndexError: list index out of range

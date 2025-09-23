@@ -6,6 +6,10 @@ from typing import Dict, Any, List, Tuple
 
 # Настройка логгера для модуля визуализации
 logger = logging.getLogger("ROBOTY.visualizer")
+try:
+    from core.mesh_loader import load_obj
+except Exception:
+    load_obj = None
 
 def _interpolate_position(trajectory: List[Dict[str, Any]], t: float) -> Tuple[float, float, float]:
     """
@@ -93,6 +97,71 @@ def _cube_edges(center: Tuple[float, float, float], size: float) -> Tuple[List[f
         ys += [v[a][1], v[b][1], None]
         zs += [v[a][2], v[b][2], None]
     return xs, ys, zs
+
+def _box_mesh(center: Tuple[float, float, float], size: Tuple[float, float, float], color: str = "#2E86DE") -> go.Mesh3d:
+    """Создает Mesh3d прямоугольного параллелепипеда (звено руки)."""
+    cx, cy, cz = center
+    sx, sy, sz = size
+    dx, dy, dz = sx/2.0, sy/2.0, sz/2.0
+    # 8 вершин
+    x = [cx-dx, cx+dx, cx+dx, cx-dx, cx-dx, cx+dx, cx+dx, cx-dx]
+    y = [cy-dy, cy-dy, cy+dy, cy+dy, cy-dy, cy-dy, cy+dy, cy+dy]
+    z = [cz-dz, cz-dz, cz-dz, cz-dz, cz+dz, cz+dz, cz+dz, cz+dz]
+    # 12 треугольников
+    i = [0, 0, 0, 1, 1, 2, 4, 4, 5, 0, 2, 6]
+    j = [1, 3, 4, 2, 5, 3, 5, 7, 6, 4, 6, 7]
+    k = [2, 2, 5, 3, 6, 7, 6, 6, 7, 7, 7, 4]
+    return go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color=color, opacity=0.5)
+
+def _oriented_box_mesh(p1: Tuple[float, float, float], p2: Tuple[float, float, float], thickness: float, color: str = "#2E86DE") -> go.Mesh3d:
+    """
+    Строит ориентированный Mesh3d прямоугольного звена между p1 и p2
+    с квадратным сечением thickness x thickness.
+    """
+    a = np.array(p1, dtype=float)
+    b = np.array(p2, dtype=float)
+    u = b - a
+    L = np.linalg.norm(u)
+    if L == 0:
+        center = a
+        return _box_mesh((float(center[0]), float(center[1]), float(center[2])), (thickness, thickness, thickness), color=color)
+    u_dir = u / L
+    # Выбираем опорный вектор неколлинеарный u_dir
+    ref = np.array([0.0, 0.0, 1.0])
+    if abs(np.dot(u_dir, ref)) > 0.95:
+        ref = np.array([0.0, 1.0, 0.0])
+    v_dir = np.cross(u_dir, ref)
+    v_norm = np.linalg.norm(v_dir)
+    if v_norm == 0:
+        v_dir = np.array([0.0, 1.0, 0.0])
+        v_norm = 1.0
+    v_dir = v_dir / v_norm
+    w_dir = np.cross(u_dir, v_dir)
+
+    center = (a + b) / 2.0
+    hu = L / 2.0
+    hv = thickness / 2.0
+    hw = thickness / 2.0
+
+    # 8 вершин: \pm u, \pm v, \pm w относительно центра
+    corners = []
+    for su in (-1, 1):
+        for sv in (-1, 1):
+            for sw in (-1, 1):
+                p = center + su * hu * u_dir + sv * hv * v_dir + sw * hw * w_dir
+                corners.append(p)
+    # Индексация вершин для удобства
+    # corners order (u,v,w): (-,-,-),( -,-,+),( -,+,-),( -,+,+),( +,-,-),( +,-,+),( +,+,-),( +,+,+)
+    x = [float(p[0]) for p in corners]
+    y = [float(p[1]) for p in corners]
+    z = [float(p[2]) for p in corners]
+
+    # Треугольники (12) по индексам 0..7
+    i = [0, 0, 0, 1, 1, 2, 4, 4, 5, 3, 2, 6]
+    j = [1, 2, 4, 3, 5, 3, 5, 6, 7, 7, 6, 7]
+    k = [2, 4, 6, 2, 6, 7, 6, 7, 7, 2, 7, 4]
+
+    return go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color=color, opacity=0.65)
 
 def create_3d_visualization(plan: Dict[str, Any]) -> go.Figure:
     """
@@ -399,12 +468,37 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d"):
                                                 line=dict(width=6, color=color),
                                                 marker=dict(size=4, color=color)))
 
-            # Следы для манипулятора и объектов
+            # Следы для манипулятора (линии)
             for i, robot in enumerate(robots):
                 base_fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode="lines",
-                                                name=f"Arm {robot['id']}",
+                                                name=f"Arm R{robot['id']}",
                                                 line=dict(width=8, color=colors[i % len(colors)]),
-                                                showlegend=False))
+                                                showlegend=True))
+
+            # Загрузка внешних мешей роботов (если задано в плане)
+            robot_mesh_cfg = plan.get("robot_mesh")
+            robot_mesh_data = None
+            if load_obj is not None and isinstance(robot_mesh_cfg, dict):
+                path = robot_mesh_cfg.get("path")
+                scale = float(robot_mesh_cfg.get("scale", 1.0))
+                if isinstance(path, str):
+                    mesh = load_obj(path, scale)
+                    if mesh is not None:
+                        robot_mesh_data = mesh  # (xs, ys, zs, is, js, ks)
+
+            # 3D меш-рука (пер-сегментные боксы)
+            use_mesh_arm = bool(plan.get("arm_mesh", False))
+            mesh_arm_counts = []  # сколько Mesh3d на робота
+            if use_mesh_arm:
+                for i, robot in enumerate(robots):
+                    segs = int(plan.get("arm_segments", 5))
+                    cnt = max(2, segs)
+                    mesh_arm_counts.append(cnt)
+                    for _ in range(cnt):
+                        # Добавляем пустой меш-заготовку на каждый сегмент
+                        base_fig.add_trace(_box_mesh(tuple(robot.get("base_xyz", [0,0,0])), (0.06, 0.06, 0.2), color=colors[i % len(colors)]))
+            else:
+                mesh_arm_counts = [0 for _ in robots]
             objects = plan.get("objects", [])
             for obj in objects:
                 base_fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode="lines",
@@ -412,15 +506,20 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d"):
                                                 line=dict(color=obj.get("color", "red"), width=6)))
 
             frames = []
+            frames_no_arms = []
             for t in times:
                 frame_data = []
+                frame_data_no_arms = []
                 for i, robot in enumerate(robots):
                     xs = [p["x"] for p in robot["trajectory"] if p["t"] <= t]
                     ys = [p["y"] for p in robot["trajectory"] if p["t"] <= t]
                     zs = [p["z"] for p in robot["trajectory"] if p["t"] <= t]
-                    frame_data.append(go.Scatter3d(x=xs, y=ys, z=zs, mode="lines+markers",
-                                                   line=dict(width=6, color=colors[i % len(colors)]),
-                                                   marker=dict(size=4, color=colors[i % len(colors)])))
+                    tcp_trace = go.Scatter3d(x=xs, y=ys, z=zs, mode="lines+markers",
+                                             line=dict(width=6, color=colors[i % len(colors)]),
+                                             marker=dict(size=4, color=colors[i % len(colors)]),
+                                             name=f"Robot {robots[i].get('id')}")
+                    frame_data.append(tcp_trace)
+                    frame_data_no_arms.append(tcp_trace)
 
                 # Манипулятор: звенья base→tcp
                 for i, robot in enumerate(robots):
@@ -429,6 +528,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d"):
                     segs = int(plan.get("arm_segments", 5))
                     arm_model = str(plan.get("arm_model", "curved"))
                     joints = _arm_segments(base, tcp, segments=max(2, segs), bulge=float(plan.get("arm_bulge", 0.18)), model=arm_model)
+                    # Линейное представление
                     xs = []
                     ys = []
                     zs = []
@@ -437,37 +537,82 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d"):
                         ys += [joints[j][1], joints[j+1][1], None]
                         zs += [joints[j][2], joints[j+1][2], None]
                     frame_data.append(go.Scatter3d(x=xs, y=ys, z=zs, mode="lines",
-                                                   line=dict(width=8, color=colors[i % len(colors)])))
+                                                   line=dict(width=8, color=colors[i % len(colors)]),
+                                                   name=f"Arm R{robot.get('id')}",
+                                                   showlegend=False))
+
+                    # Mesh-представление (боксы по сегментам)
+                    if use_mesh_arm:
+                        thickness = float(plan.get("arm_thickness", 0.06))
+                        for j in range(len(joints) - 1):
+                            p1 = (joints[j][0], joints[j][1], joints[j][2])
+                            p2 = (joints[j+1][0], joints[j+1][1], joints[j+1][2])
+                            mesh = _oriented_box_mesh(p1, p2, thickness=thickness, color=colors[i % len(colors)])
+                            mesh.update(name=f"ArmMesh R{robot.get('id')}", showlegend=False)
+                            frame_data.append(mesh)
+
+                    # Внешний меш робота на базе, ориентируем по base->tcp как приблизительную ось
+                    if robot_mesh_data is not None:
+                        xs, ys, zs, is_, js_, ks_ = robot_mesh_data
+                        # Сдвиг к базе, упрощённо без вращения (для корректного вращения нужен локальный трансформ)
+                        dx, dy, dz = base
+                        frame_data.append(go.Mesh3d(x=[x+dx for x in xs], y=[y+dy for y in ys], z=[z+dz for z in zs],
+                                                    i=is_, j=js_, k=ks_, color=colors[i % len(colors)], opacity=0.6,
+                                                    name=f"RobotMesh R{robot.get('id')}", showlegend=False))
 
                 # Объекты: перенос с TCP, если в carry_intervals
                 for obj in objects:
                     size = float(obj.get("size", 0.1))
                     center = tuple(obj.get("initial_position", [0, 0, 0]))
-                    carried_by = obj.get("carried_by")
-                    intervals = obj.get("carry_intervals", [])
-                    is_carried = False
-                    if carried_by is not None:
-                        for iv in intervals:
-                            if len(iv) == 2 and iv[0] <= t <= iv[1]:
-                                is_carried = True
+                    # Расширенная логика переноса: carry_schedule или carry_intervals
+                    schedule = obj.get("carry_schedule")
+                    current_carrier_id = None
+                    if isinstance(schedule, list) and schedule:
+                        for item in schedule:
+                            by = item.get("by")
+                            interval = item.get("interval", [])
+                            if isinstance(interval, list) and len(interval) == 2 and interval[0] <= t <= interval[1] and by is not None:
+                                robot = next((r for r in robots if r.get("id") == by), None)
+                                if robot is not None:
+                                    center = _interpolate_position(robot.get("trajectory", []), t)
+                                    current_carrier_id = by
                                 break
-                    if is_carried:
-                        robot = next((r for r in robots if r.get("id") == carried_by), None)
-                        if robot is not None:
-                            center = _interpolate_position(robot.get("trajectory", []), t)
+                    else:
+                        carried_by = obj.get("carried_by")
+                        intervals = obj.get("carry_intervals", [])
+                        if carried_by is not None:
+                            for iv in intervals:
+                                if len(iv) == 2 and iv[0] <= t <= iv[1]:
+                                    robot = next((r for r in robots if r.get("id") == carried_by), None)
+                                    if robot is not None:
+                                        center = _interpolate_position(robot.get("trajectory", []), t)
+                                        current_carrier_id = carried_by
+                                    break
                     xs, ys, zs = _cube_edges(center, size)
                     frame_data.append(go.Scatter3d(x=xs, y=ys, z=zs, mode="lines",
                                                    line=dict(color=obj.get("color", "red"), width=6)))
-                frames.append(go.Frame(data=frame_data, name=f"t={t:.2f}"))
+                    # Подсветка TCP текущего носителя и подпись
+                    if current_carrier_id is not None:
+                        carrier = next((r for r in robots if r.get("id") == current_carrier_id), None)
+                        if carrier is not None:
+                            tcp = _interpolate_position(carrier.get("trajectory", []), t)
+                            frame_data.append(go.Scatter3d(x=[tcp[0]], y=[tcp[1]], z=[tcp[2]],
+                                                           mode="markers+text",
+                                                           marker=dict(size=6, color="yellow"),
+                                                           text=[f"R{current_carrier_id}"], textposition="top center",
+                                                           name=f"Carrier R{current_carrier_id}", showlegend=False))
+                frames.append(go.Frame(data=frame_data, name=f"t={t:.2f}|arms"))
+                frames_no_arms.append(go.Frame(data=frame_data_no_arms, name=f"t={t:.2f}|noarms"))
 
-            base_fig.update(frames=frames)
+            base_fig.update(frames=frames + frames_no_arms)
             # Кнопки Play/Pause/Speed и слайдер времени
             steps = []
-            for f in base_fig.frames:
+            for t in times:
+                label = f"t={t:.2f}"
                 steps.append({
                     "method": "animate",
-                    "label": f.name,
-                    "args": [[f.name], {"mode": "immediate", "frame": {"duration": 0, "redraw": True}, "transition": {"duration": 0}}]
+                    "label": label,
+                    "args": [[f"{label}|arms"], {"mode": "immediate", "frame": {"duration": 0, "redraw": True}, "transition": {"duration": 0}}]
                 })
             base_fig.update_layout(
                 updatemenus=[
@@ -489,6 +634,16 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d"):
                         "buttons": [
                             {"label": "🐢 Медленно", "method": "animate", "args": [None, {"frame": {"duration": 160, "redraw": True}, "fromcurrent": True}]},
                             {"label": "⚡ Быстро", "method": "animate", "args": [None, {"frame": {"duration": 30, "redraw": True}, "fromcurrent": True}]},
+                        ]
+                    },
+                    {
+                        "type": "buttons",
+                        "showactive": True,
+                        "x": 0.52,
+                        "y": 0.95,
+                        "buttons": [
+                            {"label": "С руками", "method": "animate", "args": [[ [f"t={t:.2f}|arms" for t in times] ], {"frame": {"duration": 80, "redraw": True}, "mode": "immediate"}]},
+                            {"label": "Без рук", "method": "animate", "args": [[ [f"t={t:.2f}|noarms" for t in times] ], {"frame": {"duration": 80, "redraw": True}, "mode": "immediate"}]}
                         ]
                     }
                 ],

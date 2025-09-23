@@ -173,6 +173,46 @@ class Ui_MainWindow(object):
         """)
         self.horizontalLayout_control.addWidget(self.pushButton_run)
         
+        # Режим визуализации
+        self.label_viz_mode = QLabel(self.groupBox_control)
+        self.label_viz_mode.setObjectName(u"label_viz_mode")
+        self.label_viz_mode.setText("Режим визуализации:")
+        self.horizontalLayout_control.addWidget(self.label_viz_mode)
+
+        self.comboBox_viz_mode = QComboBox(self.groupBox_control)
+        self.comboBox_viz_mode.setObjectName(u"comboBox_viz_mode")
+        self.comboBox_viz_mode.addItems([
+            "Анимация (реальный режим)",
+            "Статическая 3D"
+        ])
+        self.horizontalLayout_control.addWidget(self.comboBox_viz_mode)
+
+        # Флаг 3D-меша руки
+        self.checkBox_arm_mesh = QCheckBox(self.groupBox_control)
+        self.checkBox_arm_mesh.setObjectName(u"checkBox_arm_mesh")
+        self.checkBox_arm_mesh.setText("3D рука (меш)")
+        self.horizontalLayout_control.addWidget(self.checkBox_arm_mesh)
+
+        # Подключение реальной 3D-модели (OBJ)
+        self.checkBox_robot_model = QCheckBox(self.groupBox_control)
+        self.checkBox_robot_model.setObjectName(u"checkBox_robot_model")
+        self.checkBox_robot_model.setText("Реальная 3D-модель")
+        self.horizontalLayout_control.addWidget(self.checkBox_robot_model)
+
+        self.label_robot_model = QLabel(self.groupBox_control)
+        self.label_robot_model.setObjectName(u"label_robot_model")
+        self.label_robot_model.setText("Модель:")
+        self.horizontalLayout_control.addWidget(self.label_robot_model)
+
+        self.comboBox_robot_model = QComboBox(self.groupBox_control)
+        self.comboBox_robot_model.setObjectName(u"comboBox_robot_model")
+        self.comboBox_robot_model.addItems([
+            "KUKA KR QUANTEC",
+            "KUKA KR 360 FORTEC",
+            "KUKA KR 300"
+        ])
+        self.horizontalLayout_control.addWidget(self.comboBox_robot_model)
+
         # Кнопка визуализации
         self.pushButton_viz = QPushButton(self.groupBox_control)
         self.pushButton_viz.setObjectName(u"pushButton_viz")
@@ -321,3 +361,18 @@ class Ui_MainWindow(object):
             "optimize_trajectories": self.checkBox_optimize_trajectories.isChecked(),
             "path_planning": self.checkBox_path_planning.isChecked()
         }
+
+    def get_visualization_mode(self):
+        text = self.comboBox_viz_mode.currentText()
+        if text.startswith("Анимация"):
+            return "3d_anim"
+        return "3d"
+
+    def get_arm_mesh_enabled(self):
+        return self.checkBox_arm_mesh.isChecked()
+
+    def get_robot_model_enabled(self):
+        return self.checkBox_robot_model.isChecked()
+
+    def get_robot_model_selection(self):
+        return self.comboBox_robot_model.currentText()

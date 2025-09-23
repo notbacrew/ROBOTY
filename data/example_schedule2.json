@@ -131,6 +131,20 @@
       "tool_clearance":0.2
     }
   ],
+  "objects": [
+    {
+      "id": 1,
+      "type": "cube",
+      "initial_position": [0.5, 0.5, 0.0],
+      "size": 0.12,
+      "color": "red",
+      "carry_schedule": [
+        { "by": 1, "interval": [0.5, 1.2] },
+        { "by": 2, "interval": [1.2, 1.8] },
+        { "by": 3, "interval": [1.8, 2.3] }
+      ]
+    }
+  ],
   "operations": [
     {"id":101, "robot_id":1, "type":"pick", "pick_xyz":[1,2,0], "place_xyz":[2,3,1], "start":{"x":0,"y":0,"z":0}, "end":{"x":2,"y":3,"z":1}, "duration":3.0, "t_hold":0.0, "safe_dist":0.0},
     {"id":102, "robot_id":2, "type":"place", "pick_xyz":[0,1,0], "place_xyz":[2,2,2], "start":{"x":0,"y":1,"z":0}, "end":{"x":2,"y":2,"z":2}, "duration":3.5, "t_hold":0.0, "safe_dist":0.0}

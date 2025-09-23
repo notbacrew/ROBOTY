@@ -330,8 +330,27 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
             self.textLog.append("Создание визуализации...")
             self.textLog.repaint()  # Принудительное обновление интерфейса
             
-            # По умолчанию открываем анимированную визуализацию с кнопками управления
-            show_visualization(self.plan, "3d_anim")
+            # Режим из UI
+            try:
+                viz_mode = self.get_visualization_mode() if hasattr(self, 'get_visualization_mode') else "3d_anim"
+                # Передаем флаг 3D-меша руки в план
+                if hasattr(self, 'get_arm_mesh_enabled') and isinstance(self.plan, dict):
+                    self.plan["arm_mesh"] = bool(self.get_arm_mesh_enabled())
+                # Передаем выбранную реальную модель
+                if hasattr(self, 'get_robot_model_enabled') and hasattr(self, 'get_robot_model_selection') and isinstance(self.plan, dict):
+                    if bool(self.get_robot_model_enabled()):
+                        selection = self.get_robot_model_selection()
+                        mesh_map = {
+                            "KUKA KR QUANTEC": ("assets/robots/kuka/kr_quantec.obj", 1.0),
+                            "KUKA KR 360 FORTEC": ("assets/robots/kuka/kr_360_fortec.obj", 1.0),
+                            "KUKA KR 300": ("assets/robots/kuka/kr_300.obj", 1.0),
+                        }
+                        path, scale = mesh_map.get(selection, (None, None))
+                        if path:
+                            self.plan["robot_mesh"] = {"path": path, "scale": scale}
+            except Exception:
+                viz_mode = "3d_anim"
+            show_visualization(self.plan, viz_mode)
             self.textLog.append("✅ Визуализация завершена.")
             self.textLog.append("📁 HTML файл создан в папке ROBOTY")
             self.textLog.append("🌐 Откройте файл в браузере для просмотра")

@@ -10,6 +10,7 @@ from core.parser import parse_input_file
 from core.planner import run_planner_algorithm
 from core.collision import check_collisions, check_collisions_detailed, get_collision_summary
 from viz.visualizer import show_visualization
+from core.safety import enforce_online_safety
 from core.parser_txt import RobotConfig, Operation
 import math
 
@@ -261,15 +262,53 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
             # Проверяем коллизии
             self.textLog.append("🔍 Проверка коллизий...")
             collisions = check_collisions_detailed(self.plan)
-            
+
             if collisions:
-                self.textLog.append(f"⚠️ Обнаружено {len(collisions)} коллизий!")
+                self.textLog.append(f"⚠️ Обнаружено {len(collisions)} коллизий! Применяем безопасные паузы...")
                 summary = get_collision_summary(collisions)
                 self.textLog.append(f"🤖 Затронуто роботов: {summary['affected_robots']}")
-                self.logger.warning(f"Обнаружено {len(collisions)} коллизий")
+                self.logger.warning(f"Обнаружено {len(collisions)} коллизий, применяем онлайн-безопасность")
+
+                # Применяем онлайн-безопасность (вставка пауз) и повторно проверяем
+                self.plan = enforce_online_safety(self.plan, time_step=0.05, pause_duration=0.6)
+                safe_collisions = check_collisions_detailed(self.plan)
+                if safe_collisions:
+                    self.textLog.append(f"⚠️ После вставки пауз все еще {len(safe_collisions)} коллизий.")
+                    self.logger.warning("Коллизии сохраняются после вставки пауз")
+                else:
+                    self.textLog.append("✅ Коллизии устранены безопасными паузами.")
+                    self.logger.info("Коллизии устранены онлайн-безопасностью")
             else:
                 self.textLog.append("✅ Коллизий не обнаружено.")
                 self.logger.info("Коллизий не обнаружено")
+
+            # Добавляем демонстрационный объект, если объектов нет
+            try:
+                if not isinstance(self.plan.get("objects"), list) or len(self.plan.get("objects", [])) == 0:
+                    robots = self.plan.get("robots", [])
+                    if robots:
+                        r0 = robots[0]
+                        traj = r0.get("trajectory", [])
+                        if len(traj) >= 2:
+                            t_min = traj[0].get("t", 0.0)
+                            t_max = traj[-1].get("t", t_min)
+                            t1 = t_min + 0.25 * (t_max - t_min)
+                            t2 = t_min + 0.75 * (t_max - t_min)
+                            start_pos = (traj[0].get("x", 0.0), traj[0].get("y", 0.0), max(0.0, traj[0].get("z", 0.0) - 0.05))
+                            self.plan["objects"] = [
+                                {
+                                    "id": 1,
+                                    "type": "cube",
+                                    "initial_position": list(start_pos),
+                                    "size": 0.1,
+                                    "color": "red",
+                                    "carried_by": r0.get("id", 1),
+                                    "carry_intervals": [[float(t1), float(t2)]]
+                                }
+                            ]
+                            self.textLog.append("🧱 Добавлен демонстрационный объект (красный куб) для анимации.")
+            except Exception as e:
+                self.logger.warning(f"Не удалось добавить демонстрационный объект: {e}")
                 
         except Exception as e:
             error_msg = f"❌ Ошибка планировщика: {e}"
@@ -291,7 +330,8 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
             self.textLog.append("Создание визуализации...")
             self.textLog.repaint()  # Принудительное обновление интерфейса
             
-            show_visualization(self.plan)
+            # По умолчанию открываем анимированную визуализацию с кнопками управления
+            show_visualization(self.plan, "3d_anim")
             self.textLog.append("✅ Визуализация завершена.")
             self.textLog.append("📁 HTML файл создан в папке ROBOTY")
             self.textLog.append("🌐 Откройте файл в браузере для просмотра")

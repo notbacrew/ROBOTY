@@ -109,6 +109,58 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         # Настраиваем переключатель темы
         self.setup_theme_toggle()
 
+        # Инициализируем индикатор загрузки в статус-баре
+        try:
+            if hasattr(self, 'progressBar_status'):
+                self.progressBar_status.setVisible(False)
+        except Exception:
+            pass
+
+        # Синхронизация видимости выбора реальной модели с общим флагом 3D
+        try:
+            if hasattr(self, 'checkBox_arm_mesh'):
+                self.checkBox_arm_mesh.stateChanged.connect(self.sync_model_selector_visibility)
+                self.sync_model_selector_visibility()
+        except Exception:
+            self.logger.warning("Не удалось привязать синхронизацию видимости селектора модели")
+
+        # Хранилище фоновой задачи визуализации
+        self._viz_thread = None
+        self._viz_worker = None
+
+    def show_busy(self, message: str = "Загрузка..."):
+        """Включает индикатор выполнения внизу окна (режим неизвестной длительности)."""
+        try:
+            self.statusbar.showMessage(message)
+            if hasattr(self, 'progressBar_status'):
+                self.progressBar_status.setRange(0, 0)  # неопределённый прогресс
+                self.progressBar_status.setVisible(True)
+                self.progressBar_status.repaint()
+            QtWidgets.QApplication.processEvents()
+        except Exception:
+            pass
+
+    def hide_busy(self):
+        """Выключает индикатор выполнения и очищает сообщение статуса."""
+        try:
+            self.statusbar.clearMessage()
+            if hasattr(self, 'progressBar_status'):
+                self.progressBar_status.setVisible(False)
+                self.progressBar_status.setRange(0, 100)
+        except Exception:
+            pass
+
+    def sync_model_selector_visibility(self):
+        """Показывает/скрывает выбор модели робота в зависимости от общего 3D-флага."""
+        try:
+            is_on = bool(self.get_arm_mesh_enabled()) if hasattr(self, 'get_arm_mesh_enabled') else False
+            if hasattr(self, 'label_robot_model'):
+                self.label_robot_model.setVisible(is_on)
+            if hasattr(self, 'comboBox_robot_model'):
+                self.comboBox_robot_model.setVisible(is_on)
+        except Exception:
+            pass
+
     def save_result(self):
         """Сохранение результата планирования"""
         if not self.plan:
@@ -203,6 +255,7 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
             return
         
         try:
+            self.show_busy("Планирование... Это может занять время при большом числе роботов")
             # Если выбран генетический алгоритм, используем специальные параметры
             if assignment_method == "genetic":
                 genetic_params = self.get_genetic_parameters()
@@ -282,75 +335,132 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.textLog.append("✅ Коллизий не обнаружено.")
                 self.logger.info("Коллизий не обнаружено")
 
-            # Добавляем демонстрационный объект, если объектов нет
-            try:
-                if not isinstance(self.plan.get("objects"), list) or len(self.plan.get("objects", [])) == 0:
-                    robots = self.plan.get("robots", [])
-                    if robots:
-                        r0 = robots[0]
-                        traj = r0.get("trajectory", [])
-                        if len(traj) >= 2:
-                            t_min = traj[0].get("t", 0.0)
-                            t_max = traj[-1].get("t", t_min)
-                            t1 = t_min + 0.25 * (t_max - t_min)
-                            t2 = t_min + 0.75 * (t_max - t_min)
-                            start_pos = (traj[0].get("x", 0.0), traj[0].get("y", 0.0), max(0.0, traj[0].get("z", 0.0) - 0.05))
-                            self.plan["objects"] = [
-                                {
-                                    "id": 1,
-                                    "type": "cube",
-                                    "initial_position": list(start_pos),
-                                    "size": 0.1,
-                                    "color": "red",
-                                    "carried_by": r0.get("id", 1),
-                                    "carry_intervals": [[float(t1), float(t2)]]
-                                }
-                            ]
-                            self.textLog.append("🧱 Добавлен демонстрационный объект (красный куб) для анимации.")
-            except Exception as e:
-                self.logger.warning(f"Не удалось добавить демонстрационный объект: {e}")
+            # Больше не добавляем демонстрационный объект автоматически (R1 удалён)
                 
         except Exception as e:
             error_msg = f"❌ Ошибка планировщика: {e}"
             self.textLog.append(error_msg)
             self.logger.error(error_msg, exc_info=True)
+        finally:
+            self.hide_busy()
 
     def open_visualizer(self):
         """Открытие визуализатора"""
         self.logger.info("Открытие визуализатора")
         self.textLog.append("Открытие визуализатора...")
-        
+
         if not self.plan:
             self.textLog.append("Нет плана для визуализации. Сначала запустите планировщик.")
             self.logger.warning("Попытка визуализации без плана")
             return
         
         try:
-            # Добавляем индикатор прогресса
+            # Включаем индикатор прогресса (неопределённый) ДО любых тяжёлых операций
+            self.show_busy("Генерация визуализации... 3D может занять время")
             self.textLog.append("Создание визуализации...")
             self.textLog.repaint()  # Принудительное обновление интерфейса
             
             # Режим из UI
             try:
                 viz_mode = self.get_visualization_mode() if hasattr(self, 'get_visualization_mode') else "3d_anim"
-                # Передаем флаг 3D-меша руки в план
+                # Передаем флаг 3D-меша руки и стиль руки
                 if hasattr(self, 'get_arm_mesh_enabled') and isinstance(self.plan, dict):
                     self.plan["arm_mesh"] = bool(self.get_arm_mesh_enabled())
+                    if self.plan["arm_mesh"]:
+                        self.plan.setdefault("arm_style", "realistic")  # более реалистичные звенья по умолчанию
+                    # Автоподключение внешнего описания хватателя, если доступно (Windows путь из сообщения)
+                    try:
+                        import os
+                        hand_path = r"C:\Users\79518\OneDrive\Рабочий стол\Конкурс\Улучшения.txt"
+                        if os.path.isfile(hand_path):
+                            self.plan["hand_definition"] = {"path": hand_path, "scale": 1.0}
+                    except Exception:
+                        pass
                 # Передаем выбранную реальную модель
                 if hasattr(self, 'get_robot_model_enabled') and hasattr(self, 'get_robot_model_selection') and isinstance(self.plan, dict):
                     if bool(self.get_robot_model_enabled()):
                         selection = self.get_robot_model_selection()
-                        mesh_map = {
-                            "KUKA KR QUANTEC": ("assets/robots/kuka/kr_quantec.obj", 1.0),
-                            "KUKA KR 360 FORTEC": ("assets/robots/kuka/kr_360_fortec.obj", 1.0),
-                            "KUKA KR 300": ("assets/robots/kuka/kr_300.obj", 1.0),
-                        }
-                        path, scale = mesh_map.get(selection, (None, None))
-                        if path:
-                            self.plan["robot_mesh"] = {"path": path, "scale": scale}
+                        # Независимо от выбора стандартного названия, всегда используем пользовательскую модель
+                        self.plan["robot_mesh"] = {"path": "1758706684_68d3bbfcdbb32.obj", "scale": 1.0}
+                        # Ускоряем анимацию по умолчанию для тяжёлых мешей
+                        self.plan.setdefault("max_anim_frames", 240)
+                        self.plan.setdefault("anim_time_stride", 0.05)
+                        # Отключаем сегментные меш-руки, чтобы не дублировать геометрию
+                        self.plan["arm_mesh"] = False
+                # Текстовые предупреждения о нагрузке
+                if self.plan.get("arm_mesh") or self.plan.get("robot_mesh"):
+                    self.textLog.append("⚠️ Внимание: Включена 3D рука/модель. Это может значительно нагрузить систему и увеличить время загрузки визуализации.")
+                    self.statusbar.showMessage("⚠️ 3D визуализация может загружаться дольше из-за высокой детализации")
+                # Применяем эвристики производительности под число роботов
+                robots = self.plan.get("robots", []) if isinstance(self.plan, dict) else []
+                n = len(robots)
+                if n >= 8:
+                    self.plan.setdefault("max_anim_frames", 240)
+                    self.plan.setdefault("anim_time_stride", 0.05)
+                    self.plan.setdefault("arm_segments", 5)
+                if n >= 15:
+                    # Более агрессивные настройки
+                    self.plan["max_anim_frames"] = min(int(self.plan.get("max_anim_frames", 240)), 200)
+                    self.plan["anim_time_stride"] = max(float(self.plan.get("anim_time_stride", 0.05)), 0.06)
+                    self.plan["arm_segments"] = min(int(self.plan.get("arm_segments", 5)), 4)
+                if n >= 25:
+                    # Очень большая сцена: отключить внешние меши, если не задано явно
+                    if "robot_mesh" not in self.plan:
+                        self.plan["robot_mesh"] = None
+
             except Exception:
                 viz_mode = "3d_anim"
-            show_visualization(self.plan, viz_mode)
+
+            # Запускаем визуализацию в фоне, чтобы UI не подвисал
+            class VizWorker(QtCore.QObject):
+                finished = QtCore.Signal()
+                error = QtCore.Signal(str)
+                progress = QtCore.Signal(int)
+                def __init__(self, plan, mode):
+                    super().__init__()
+                    self._plan = plan
+                    self._mode = mode
+                @QtCore.Slot()
+                def run(self):
+                    try:
+                        def _cb(p):
+                            try:
+                                self.progress.emit(int(p))
+                            except Exception:
+                                pass
+                        show_visualization(self._plan, self._mode, progress_callback=_cb)
+                        self.finished.emit()
+                    except Exception as e:
+                        self.error.emit(str(e))
+
+            # Создаем поток и исполнителя
+            self._viz_thread = QtCore.QThread(self)
+            self._viz_worker = VizWorker(dict(self.plan), viz_mode)
+            self._viz_worker.moveToThread(self._viz_thread)
+            self._viz_thread.started.connect(self._viz_worker.run)
+
+            def _on_viz_done():
+                self.textLog.append("✅ Визуализация завершена.")
+                self.textLog.append("📁 HTML файл создан в папке ROBOTY")
+                self.textLog.append("🌐 Откройте файл в браузере для просмотра")
+                self.logger.info("Визуализация успешно завершена (в фоне)")
+                self.hide_busy()
+                self._viz_thread.quit()
+
+            def _on_viz_err(msg: str):
+                error_msg = f"❌ Ошибка визуализации: {msg}"
+                self.textLog.append(error_msg)
+                self.logger.error(error_msg)
+                self.hide_busy()
+                self._viz_thread.quit()
+
+            self._viz_worker.finished.connect(_on_viz_done)
+            self._viz_worker.progress.connect(self._on_viz_progress)
+            self._viz_worker.error.connect(_on_viz_err)
+            self._viz_thread.finished.connect(self._viz_worker.deleteLater)
+            self._viz_thread.finished.connect(self._viz_thread.deleteLater)
+
+            self._viz_thread.start()
             self.textLog.append("✅ Визуализация завершена.")
             self.textLog.append("📁 HTML файл создан в папке ROBOTY")
             self.textLog.append("🌐 Откройте файл в браузере для просмотра")
@@ -360,6 +470,25 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
             self.textLog.append(error_msg)
             self.textLog.append("💡 Попробуйте запустить планировщик заново")
             self.logger.error(error_msg, exc_info=True)
+        finally:
+            self.hide_busy()
+
+    @QtCore.Slot(int)
+    def _on_viz_progress(self, value: int):
+        try:
+            if hasattr(self, 'progressBar_bottom'):
+                self.progressBar_bottom.setRange(0, 100)
+                self.progressBar_bottom.setValue(int(value))
+                self.progressBar_bottom.repaint()
+            if hasattr(self, 'labelProgress_bottom'):
+                self.labelProgress_bottom.setText(f"Загрузка визуализации: {int(value)}%")
+            if hasattr(self, 'progressBar_status'):
+                self.progressBar_status.setRange(0, 100)
+                self.progressBar_status.setValue(int(value))
+                self.progressBar_status.repaint()
+            QtWidgets.QApplication.processEvents()
+        except Exception:
+            pass
 
     def update_genetic_controls(self):
         """Обновляет видимость элементов управления генетическим алгоритмом"""

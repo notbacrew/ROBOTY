@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGroupBox,
     QGridLayout, QHBoxLayout, QLabel, QMainWindow, QMenu,
     QMenuBar, QPushButton, QSizePolicy, QSpacerItem,
     QSpinBox, QStatusBar, QTextEdit, QVBoxLayout,
-    QWidget, QSplitter)
+    QWidget, QSplitter, QProgressBar)
 from PySide6.QtGui import QAction
 
 class Ui_MainWindow(object):
@@ -187,17 +187,16 @@ class Ui_MainWindow(object):
         ])
         self.horizontalLayout_control.addWidget(self.comboBox_viz_mode)
 
-        # Флаг 3D-меша руки
+        # Флаг 3D (рука/модель)
         self.checkBox_arm_mesh = QCheckBox(self.groupBox_control)
         self.checkBox_arm_mesh.setObjectName(u"checkBox_arm_mesh")
-        self.checkBox_arm_mesh.setText("3D рука (меш)")
+        self.checkBox_arm_mesh.setText("3D рука/модель")
         self.horizontalLayout_control.addWidget(self.checkBox_arm_mesh)
 
-        # Подключение реальной 3D-модели (OBJ)
+        # Упрощение: отдельный флаг для реальной модели скрыт, используем общий чекбокс
         self.checkBox_robot_model = QCheckBox(self.groupBox_control)
         self.checkBox_robot_model.setObjectName(u"checkBox_robot_model")
-        self.checkBox_robot_model.setText("Реальная 3D-модель")
-        self.horizontalLayout_control.addWidget(self.checkBox_robot_model)
+        self.checkBox_robot_model.setVisible(False)
 
         self.label_robot_model = QLabel(self.groupBox_control)
         self.label_robot_model.setObjectName(u"label_robot_model")
@@ -258,6 +257,36 @@ class Ui_MainWindow(object):
         self.textLog.setPlaceholderText("Логи работы программы будут отображаться здесь...")
         self.textLog.setMinimumHeight(300)  # Минимальная высота
         self.verticalLayout_logs.addWidget(self.textLog)
+
+        # Нижняя панель с прогресс-баром (фиолетовый)
+        self.progressBar_bottom = QProgressBar(self.groupBox_logs)
+        self.progressBar_bottom.setObjectName(u"progressBar_bottom")
+        self.progressBar_bottom.setMinimumHeight(18)
+        self.progressBar_bottom.setRange(0, 100)
+        self.progressBar_bottom.setValue(0)
+        self.progressBar_bottom.setTextVisible(False)
+        self.progressBar_bottom.setStyleSheet("""
+            QProgressBar {
+                background-color: #EDE7F6; /* светло-фиолетовый фон */
+                border: 1px solid #C7A4FF; /* нежный бордер */
+                border-radius: 6px;
+                padding: 1px;
+            }
+            QProgressBar::chunk {
+                background-color: #6A0DAD; /* фиолетовое заполнение */
+                width: 8px;
+                margin: 0.5px;
+                border-radius: 6px;
+            }
+        """)
+        self.verticalLayout_logs.addWidget(self.progressBar_bottom)
+
+        # Подпись под прогресс-баром с процентами
+        self.labelProgress_bottom = QLabel(self.groupBox_logs)
+        self.labelProgress_bottom.setObjectName(u"labelProgress_bottom")
+        self.labelProgress_bottom.setText("Загрузка визуализации: 0%")
+        self.labelProgress_bottom.setStyleSheet("color: #6A0DAD; font-weight: 600;")
+        self.verticalLayout_logs.addWidget(self.labelProgress_bottom)
         
         self.verticalLayout_main.addWidget(self.groupBox_logs)
         
@@ -282,6 +311,16 @@ class Ui_MainWindow(object):
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
         MainWindow.setStatusBar(self.statusbar)
+
+        # Индикатор прогресса в статус-баре (нижняя полоса загрузки)
+        self.progressBar_status = QProgressBar()
+        self.progressBar_status.setObjectName(u"progressBar_status")
+        # Фиксированная ширина как в первоначальном виде
+        self.progressBar_status.setMaximumWidth(240)
+        self.progressBar_status.setTextVisible(False)
+        self.progressBar_status.setRange(0, 100)
+        self.progressBar_status.setValue(0)
+        self.statusbar.addPermanentWidget(self.progressBar_status)
         
         # Действия меню
         self.actionLoad = QAction(MainWindow)
@@ -372,7 +411,8 @@ class Ui_MainWindow(object):
         return self.checkBox_arm_mesh.isChecked()
 
     def get_robot_model_enabled(self):
-        return self.checkBox_robot_model.isChecked()
+        # Единый переключатель: включает и меш-руку, и реальную модель
+        return self.checkBox_arm_mesh.isChecked()
 
     def get_robot_model_selection(self):
         return self.comboBox_robot_model.currentText()

@@ -59,3 +59,67 @@ def load_obj(filepath: str, scale: float = 1.0) -> Optional[Tuple[List[float], L
         return None
 
 
+
+def load_hand_definition(filepath: str, scale: float = 1.0) -> Optional[dict]:
+    """
+    Загружает упрощённое описание руки из произвольного текстового файла
+    (подобного OBJ), где присутствуют:
+      - v x y z — вершины
+      - l i j k ... — полилинии (индексы вершин)
+      - p i j k ... — набор точек (например, шарниры)
+
+    Возвращает словарь:
+      { 'vertices': [(x,y,z), ...], 'segments': [ (i1, i2), ... ], 'points': [i, ...] }
+    Индексы конвертируются в пары сегментов по соседним вершинам линии.
+    Масштаб применяется к координатам.
+    """
+    try:
+        if not os.path.isfile(filepath):
+            logger.warning(f"Файл определения руки не найден: {filepath}")
+            return None
+        vertices: List[Tuple[float, float, float]] = []
+        polylines: List[List[int]] = []
+        points: List[int] = []
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('v '):
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        x = float(parts[1]) * scale
+                        y = float(parts[2]) * scale
+                        z = float(parts[3]) * scale
+                        vertices.append((x, y, z))
+                elif line.startswith('l '):
+                    parts = line.split()
+                    idxs: List[int] = []
+                    for p in parts[1:]:
+                        # поддержка v/vt формы: берём первую часть
+                        s = p.split('/')
+                        if s[0]:
+                            idx = int(s[0])
+                            if idx < 0:
+                                idx = len(vertices) + 1 + idx
+                            idxs.append(idx - 1)
+                    if len(idxs) >= 2:
+                        polylines.append(idxs)
+                elif line.startswith('p '):
+                    parts = line.split()
+                    for p in parts[1:]:
+                        if p.isdigit() or (p.startswith('-') and p[1:].isdigit()):
+                            idx = int(p)
+                            if idx < 0:
+                                idx = len(vertices) + 1 + idx
+                            points.append(idx - 1)
+        # Строим сегменты
+        segments: List[Tuple[int, int]] = []
+        for poly in polylines:
+            for a, b in zip(poly[:-1], poly[1:]):
+                segments.append((a, b))
+        logger.info(f"Hand definition загружен: {filepath}, вершин={len(vertices)}, сегментов={len(segments)}, точек={len(points)}")
+        return { 'vertices': vertices, 'segments': segments, 'points': points }
+    except Exception as e:
+        logger.error(f"Ошибка чтения hand definition {filepath}: {e}")
+        return None

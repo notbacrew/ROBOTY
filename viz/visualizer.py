@@ -894,9 +894,9 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                     {
                         "type": "buttons",
                         "showactive": True,
-                        # Правее и ниже, чтобы не перекрывать первую группу
-                        "x": 0.22,
-                        "y": 0.88,
+                        # Под первой группой, выровнено по левому краю
+                        "x": 0.02,
+                        "y": 0.90,
                         "direction": "left",
                         "pad": {"r": 10, "t": 5},
                         "buttons": [

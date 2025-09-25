@@ -359,18 +359,22 @@ def create_3d_visualization(plan: Dict[str, Any]) -> go.Figure:
     fig.update_layout(
         title=title,
         scene=dict(
+            domain=dict(x=[0.35, 0.98], y=[0.15, 0.95]),
             xaxis_title="X (m)",
             yaxis_title="Y (m)",
             zaxis_title="Z (m)",
-            aspectmode="cube"
+            aspectmode="cube",
+            dragmode="orbit"
         ),
         margin=dict(l=0, r=0, b=0, t=50),
+        template="plotly_white",
         legend=dict(
             yanchor="top",
             y=0.99,
             xanchor="left",
             x=0.01
-        )
+        ),
+        uirevision="keep"
     )
     
     logger.info("3D визуализация создана")
@@ -436,7 +440,8 @@ def create_2d_projection(plan: Dict[str, Any], projection: str = "xy") -> go.Fig
         title=f"Robot Trajectories - {projection.upper()} Projection (makespan = {makespan:.2f} sec)",
         xaxis_title=f"{label1} (m)",
         yaxis_title=f"{label2} (m)",
-        margin=dict(l=0, r=0, b=0, t=50)
+        margin=dict(l=0, r=0, b=0, t=50),
+        template="plotly_white"
     )
     
     return fig
@@ -505,7 +510,8 @@ def create_time_analysis(plan: Dict[str, Any]) -> go.Figure:
     fig.update_layout(
         title="Time Analysis",
         height=600,
-        margin=dict(l=0, r=0, b=0, t=50)
+        margin=dict(l=0, r=0, b=0, t=50),
+        template="plotly_white"
     )
     
     fig.update_xaxes(title_text="Time (s)", row=2, col=1)
@@ -862,7 +868,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                     progress_callback(97)
                 except Exception:
                     pass
-            # Кнопки Play/Pause/Speed и слайдер времени
+            # Кнопки Play/Pause и слайдеры (время и скорость)
             steps = []
             for t in times:
                 label = f"t={t:.2f}"
@@ -878,41 +884,74 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                         "showactive": True,
                         "x": 0.02,
                         "y": 0.95,
+                        "direction": "left",
+                        "pad": {"r": 10, "t": 5},
                         "buttons": [
-                            {"label": "▶ Старт", "method": "animate", "args": [None, {"frame": {"duration": 80, "redraw": True}, "fromcurrent": True}]},
+                            {"label": "▶ Старт", "method": "animate", "args": [None, {"frame": {"duration": 80, "redraw": True}, "fromcurrent": True, "mode": "immediate"}]},
                             {"label": "⏸ Пауза", "method": "animate", "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]},
                         ]
                     },
                     {
                         "type": "buttons",
                         "showactive": True,
-                        "x": 0.28,
-                        "y": 0.95,
-                        "buttons": [
-                            {"label": "🐢 Медленно", "method": "animate", "args": [None, {"frame": {"duration": 160, "redraw": True}, "fromcurrent": True}]},
-                            {"label": "⚡ Быстро", "method": "animate", "args": [None, {"frame": {"duration": 30, "redraw": True}, "fromcurrent": True}]},
-                        ]
-                    },
-                    {
-                        "type": "buttons",
-                        "showactive": True,
-                        # Перемещаем правее рядом с контролом скорости
-                        "x": 0.60,
-                        "y": 0.95,
+                        # Правее и ниже, чтобы не перекрывать первую группу
+                        "x": 0.22,
+                        "y": 0.88,
+                        "direction": "left",
+                        "pad": {"r": 10, "t": 5},
                         "buttons": [
                             {"label": "С руками", "method": "animate", "args": [[ [f"t={t:.2f}|arms" for t in times] ], {"frame": {"duration": 80, "redraw": True}, "mode": "immediate"}]},
                             {"label": "Без рук", "method": "animate", "args": [[ [f"t={t:.2f}|noarms" for t in times] ], {"frame": {"duration": 80, "redraw": True}, "mode": "immediate"}]}
                         ]
                     }
                 ],
+                # Первый слайдер — по времени
                 sliders=[{
                     "active": 0,
                     "currentvalue": {"prefix": "t=", "suffix": "", "visible": True},
                     "pad": {"t": 30},
                     "steps": steps,
-                    "x": 0.05,
+                    "x": 0.02,
                     "y": 0.02
+                },
+                # Второй слайдер — скорость анимации (frame duration)
+                {
+                    "active": 3,
+                    "currentvalue": {"prefix": "Speed: ", "suffix": " ms/frame", "visible": True},
+                    "pad": {"t": 10},
+                    "steps": [
+                        {"label": "200", "method": "animate", "args": [None, {"frame": {"duration": 200, "redraw": True}, "fromcurrent": True, "mode": "immediate"}]},
+                        {"label": "120", "method": "animate", "args": [None, {"frame": {"duration": 120, "redraw": True}, "fromcurrent": True, "mode": "immediate"}]},
+                        {"label": "80",  "method": "animate", "args": [None, {"frame": {"duration": 80,  "redraw": True}, "fromcurrent": True, "mode": "immediate"}]},
+                        {"label": "60",  "method": "animate", "args": [None, {"frame": {"duration": 60,  "redraw": True}, "fromcurrent": True, "mode": "immediate"}]},
+                        {"label": "40",  "method": "animate", "args": [None, {"frame": {"duration": 40,  "redraw": True}, "fromcurrent": True, "mode": "immediate"}]},
+                        {"label": "20",  "method": "animate", "args": [None, {"frame": {"duration": 20,  "redraw": True}, "fromcurrent": True, "mode": "immediate"}]}
+                    ],
+                    "x": 0.02,
+                    "y": 0.08
                 }]
+            )
+
+            # Улучшаем UX легенды: явная подсказка и оформление
+            base_fig.update_layout(
+                legend_title_text="Robots (кликните для скрытия/показа)",
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.02,
+                    borderwidth=1,
+                    bgcolor="rgba(255,255,255,0.6)",
+                    itemclick="toggle",
+                    itemdoubleclick="toggleothers"
+                ),
+                annotations=[dict(
+                    text="Подсказка: кликайте по элементам легенды, чтобы скрыть/показать роботов",
+                    showarrow=False,
+                    xref="paper", yref="paper",
+                    x=0.35, y=1.06, xanchor="left", yanchor="bottom",
+                    font=dict(size=12, color="#555")
+                )]
             )
 
             fig = base_fig
@@ -925,7 +964,14 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_viz_{visualization_type}.html")
             tmp_path = tmp.name
             tmp.close()
-            fig.write_html(tmp_path, auto_open=False)
+            plotly_config = {
+                "scrollZoom": True,
+                "displaylogo": False,
+                "displayModeBar": True,
+                "staticPlot": False,
+                "responsive": True
+            }
+            fig.write_html(tmp_path, auto_open=False, config=plotly_config)
             logger.info(f"Визуализация записана во временный файл: {tmp_path}")
             # Пытаемся открыть в браузере
             try:
@@ -935,7 +981,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                 logger.warning(f"Не удалось открыть в браузере: {browser_error}")
                 # Фолбэк: пробуем встроенный просмотрщик
                 try:
-                    fig.show()
+                    fig.show(config=plotly_config)
                 except Exception:
                     pass
 
@@ -960,7 +1006,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
             logger.error(f"Ошибка показа визуализации: {err}")
             # Последняя попытка — прямой показ без файла
             try:
-                fig.show()
+                fig.show(config=plotly_config)
             except Exception as show_error:
                 logger.error(f"Не удалось отобразить визуализацию: {show_error}")
                 raise

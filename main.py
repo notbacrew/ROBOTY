@@ -93,7 +93,7 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         # Инициализация данных
         self.input_data = None
         self.plan = None
-        self.current_theme = 'light'  # Текущая тема
+        self.current_theme = 'dark'  # Текущая тема по умолчанию: тёмная
         
         # Применяем начальную тему
         self.apply_theme(self.current_theme)

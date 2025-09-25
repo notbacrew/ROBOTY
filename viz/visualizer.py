@@ -919,44 +919,48 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
         else:
             raise ValueError(f"Неизвестный тип визуализации: {visualization_type}")
         
-        # Сначала сохраняем в HTML файл (более надежно)
+        # Открываем как раньше через HTML, но сохраняем во временный файл и удаляем его позже
         try:
-            import os
-            timestamp = __import__('datetime').datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # Создаем папку для визуализаций если её нет
-            viz_dir = os.path.join(os.path.dirname(__file__), "..", "outputs", "visualizations")
-            os.makedirs(viz_dir, exist_ok=True)
-            
-            html_file = os.path.join(viz_dir, f"visualization_{visualization_type}_{timestamp}.html")
-            fig.write_html(html_file, auto_open=False)
-            logger.info(f"Визуализация сохранена в файл: {html_file}")
-            print(f"✅ Визуализация сохранена в файл: {html_file}")
-            print(f"📁 Полный путь: {os.path.abspath(html_file)}")
-            print("🌐 Откройте этот файл в браузере для просмотра")
+            import tempfile, os, atexit, threading, webbrowser
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_viz_{visualization_type}.html")
+            tmp_path = tmp.name
+            tmp.close()
+            fig.write_html(tmp_path, auto_open=False)
+            logger.info(f"Визуализация записана во временный файл: {tmp_path}")
+            # Пытаемся открыть в браузере
+            try:
+                webbrowser.open(f"file://{os.path.abspath(tmp_path)}")
+                logger.info("Визуализация открыта в браузере из временного файла")
+            except Exception as browser_error:
+                logger.warning(f"Не удалось открыть в браузере: {browser_error}")
+                # Фолбэк: пробуем встроенный просмотрщик
+                try:
+                    fig.show()
+                except Exception:
+                    pass
+
+            # План удаления: на выходе процесса и таймером через 5 минут
+            def _safe_unlink(path: str):
+                try:
+                    if os.path.exists(path):
+                        os.unlink(path)
+                        logger.info(f"Временный файл визуализации удалён: {path}")
+                except Exception as e_del:
+                    logger.warning(f"Не удалось удалить временный файл: {e_del}")
+
+            atexit.register(_safe_unlink, tmp_path)
+            threading.Timer(300.0, _safe_unlink, args=(tmp_path,)).start()
+
             if callable(progress_callback):
                 try:
                     progress_callback(100)
                 except Exception:
                     pass
-            
-            # Пытаемся открыть в браузере (необязательно)
-            try:
-                import webbrowser
-                webbrowser.open(f"file://{os.path.abspath(html_file)}")
-                logger.info("Визуализация открыта в браузере")
-            except Exception as browser_error:
-                logger.warning(f"Не удалось открыть в браузере: {browser_error}")
-                print("⚠️  Не удалось автоматически открыть в браузере")
-                print("   Откройте файл вручную в любом браузере")
-                
-        except Exception as save_error:
-            logger.error(f"Не удалось сохранить визуализацию: {save_error}")
-            print(f"❌ Ошибка сохранения визуализации: {save_error}")
-            # Последняя попытка - показать в браузере
+        except Exception as err:
+            logger.error(f"Ошибка показа визуализации: {err}")
+            # Последняя попытка — прямой показ без файла
             try:
                 fig.show()
-                logger.info("Визуализация отображена в браузере")
             except Exception as show_error:
                 logger.error(f"Не удалось отобразить визуализацию: {show_error}")
                 raise

@@ -12,6 +12,50 @@ except Exception:
     load_obj = None
     load_hand_definition = None
 
+def _add_chessboard(fig: go.Figure, plan: Dict[str, Any], tiles: int = 12, tile_size: float = 0.5) -> Dict[str, Any]:
+    """
+    Добавляет под сцену «шахматную доску» (Surface) для выбора позиций роботов.
+    Возвращает словарь с параметрами доски для использования в JS (origin, tiles, tile_size, z).
+    """
+    try:
+        robots = plan.get("robots", []) if isinstance(plan, dict) else []
+        zs: List[float] = []
+        for r in robots:
+            traj = r.get("trajectory", [])
+            if traj:
+                zs.extend([float(p.get("z", 0.0)) for p in traj])
+            base = r.get("base_xyz")
+            if isinstance(base, (list, tuple)) and len(base) == 3:
+                zs.append(float(base[2]))
+        z_min = min(zs) if zs else 0.0
+        z_plane = z_min - 0.05
+        half = tiles * tile_size / 2.0
+        x0 = -half
+        y0 = -half
+        # Сетка для Surface: (tiles+1)x(tiles+1)
+        xs = np.linspace(x0, x0 + tiles * tile_size, tiles + 1)
+        ys = np.linspace(y0, y0 + tiles * tile_size, tiles + 1)
+        X, Y = np.meshgrid(xs, ys)
+        Z = np.full_like(X, fill_value=z_plane, dtype=float)
+        # Цвета клеток: чёрно-белые по чётности клетки
+        # surfacecolor должен иметь ту же форму, зададим через сумму индексов
+        parity = np.add.outer(np.arange(tiles + 1), np.arange(tiles + 1)) % 2
+        # Нормализуем к 0..1
+        surfacecolor = parity.astype(float)
+        board = go.Surface(
+            x=X, y=Y, z=Z,
+            surfacecolor=surfacecolor,
+            colorscale=[[0.0, "#eaeaea"], [1.0, "#cfcfcf"]],
+            showscale=False,
+            opacity=1.0,
+            name="Board"
+        )
+        fig.add_trace(board)
+        return {"origin": [x0, y0], "tiles": int(tiles), "tile_size": float(tile_size), "z": float(z_plane)}
+    except Exception as e:
+        logger.warning(f"Не удалось добавить шахматную доску: {e}")
+        return {"origin": [-3.0, -3.0], "tiles": int(tiles), "tile_size": float(tile_size), "z": 0.0}
+
 def _interpolate_position(trajectory: List[Dict[str, Any]], t: float) -> Tuple[float, float, float]:
     """
     Линейная интерполяция позиции TCP по времени t.
@@ -531,8 +575,11 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
     logger.info(f"Запуск визуализации типа: {visualization_type}")
     
     try:
+        board_info = None
         if visualization_type == "3d":
             fig = create_3d_visualization(plan)
+            # Добавляем шахматную доску для выбора позиций
+            board_info = _add_chessboard(fig, plan)
         elif visualization_type.startswith("2d_"):
             projection = visualization_type.split("_")[1]
             fig = create_2d_projection(plan, projection)
@@ -542,6 +589,8 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
             # Реал-тайм анимация с использованием кадров по времени
             logger.info("Создание 3D анимации траекторий")
             base_fig = create_3d_visualization({**plan, "robots": []})
+            # Шахматная доска на фоне
+            board_info = _add_chessboard(base_fig, plan)
             if callable(progress_callback):
                 try:
                     progress_callback(5)
@@ -971,7 +1020,105 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                 "staticPlot": False,
                 "responsive": True
             }
-            fig.write_html(tmp_path, auto_open=False, config=plotly_config)
+            # Добавляем интерактивный обработчик выбора позиций роботов на шахматной доске
+            try:
+                num_robots = int(len(plan.get("robots", []))) if isinstance(plan, dict) else 0
+            except Exception:
+                num_robots = 0
+            bi = board_info or {"origin": [-3.0, -3.0], "tiles": 12, "tile_size": 0.5, "z": 0.0}
+            post_script_header = (
+                "var gd = document.getElementsByClassName('plotly-graph-div')[0];\n"
+                f"var originX = {bi['origin'][0]};\n"
+                f"var originY = {bi['origin'][1]};\n"
+                f"var tiles = {bi['tiles']};\n"
+                f"var tileSize = {bi['tile_size']};\n"
+                f"var boardZ = {bi['z']};\n"
+                f"var totalRobots = {num_robots};\n"
+                "var occupied = new Set();\n"
+                "var selections = [];\n"
+            )
+            post_script_body = """
+function idxKey(i,j){ return i+','+j; }
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function addMarker(x,y,z,label){
+  Plotly.addTraces(gd, [{
+    type: 'scatter3d', mode: 'markers+text',
+    x: [x], y: [y], z: [z],
+    marker: {size: 6, color: '#222'},
+    text: [label], textposition: 'top center',
+    name: 'Placement'
+  }]);
+}
+async function copyToClipboard(text){
+  try{
+    if(navigator && navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  }catch(e){}
+  try{
+    var ta=document.createElement('textarea');
+    ta.value=text; document.body.appendChild(ta); ta.select();
+    var ok=document.execCommand('copy'); document.body.removeChild(ta);
+    return ok;
+  }catch(e){ return false; }
+}
+function download(filename, text) {
+  var element = document.createElement('a');
+  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+  element.setAttribute('download', filename);
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}
+function ensureButton(){
+  var id='save-robot-positions';
+  if(document.getElementById(id)) return;
+  var btn=document.createElement('button');
+  btn.id=id; btn.textContent='Сохранить позиции роботов';
+  btn.style.position='absolute'; btn.style.zIndex=1000; btn.style.right='12px'; btn.style.bottom='12px';
+  btn.style.padding='8px 12px'; btn.style.borderRadius='6px'; btn.style.border='1px solid #888';
+  btn.onclick=function(){ download('robot_positions.json', JSON.stringify(selections, null, 2)); };
+  gd.parentElement.style.position='relative';
+  gd.parentElement.appendChild(btn);
+  var id2='copy-robot-positions';
+  if(!document.getElementById(id2)){
+    var btn2=document.createElement('button');
+    btn2.id=id2; btn2.textContent='Скопировать позиции';
+    btn2.style.position='absolute'; btn2.style.zIndex=1000; btn2.style.right='12px'; btn2.style.bottom='48px';
+    btn2.style.padding='8px 12px'; btn2.style.borderRadius='6px'; btn2.style.border='1px solid #888';
+    btn2.onclick=async function(){
+      var ok=await copyToClipboard(JSON.stringify(selections, null, 2));
+      btn2.textContent = ok ? 'Скопировано ✓' : 'Скопировать позиции';
+      setTimeout(function(){ btn2.textContent='Скопировать позиции'; }, 1500);
+    };
+    gd.parentElement.appendChild(btn2);
+  }
+}
+gd.on('plotly_click', function(ev){
+  try{
+    if(totalRobots <= 0) return;
+    if(selections.length >= totalRobots) return;
+    if(!ev || !ev.points || !ev.points.length) return;
+    var p = ev.points[0];
+    var x = p.x, y = p.y;
+    var i = Math.floor((x - originX)/tileSize);
+    var j = Math.floor((y - originY)/tileSize);
+    if(i < 0 || j < 0 || i >= tiles || j >= tiles) return;
+    var key = idxKey(i,j);
+    if(occupied.has(key)) return;
+    occupied.add(key);
+    var cx = originX + (i + 0.5) * tileSize;
+    var cy = originY + (j + 0.5) * tileSize;
+    selections.push({robotIndex: selections.length, x: cx, y: cy, z: boardZ});
+    addMarker(cx, cy, boardZ, 'R' + selections.length);
+    if(selections.length === totalRobots){ ensureButton(); }
+  }catch(e){ /* noop */ }
+});
+""".strip()
+            post_script = post_script_header + post_script_body
+            fig.write_html(tmp_path, auto_open=False, config=plotly_config, post_script=post_script)
             logger.info(f"Визуализация записана во временный файл: {tmp_path}")
             # Пытаемся открыть в браузере
             try:

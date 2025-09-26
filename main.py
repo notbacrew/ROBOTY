@@ -5,6 +5,8 @@ import os
 from datetime import datetime
 from ui_files.main_window_improved import Ui_MainWindow
 from ui_files.input_generator_dialog import InputGeneratorDialog
+from ui_files.position_selector import PositionSelectorDialog
+from ui_files.paste_positions_dialog import PastePositionsDialog
 from ui_files.styles_final import get_light_style, get_dark_style, get_colors
 from core.parser import parse_input_file
 from core.planner import run_planner_algorithm
@@ -127,6 +129,9 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         # Хранилище фоновой задачи визуализации
         self._viz_thread = None
         self._viz_worker = None
+        # Сerver for 3D selection apply (отключено)
+        self._sel_server = None
+        self._sel_thread = None
 
     def show_busy(self, message: str = "Загрузка..."):
         """Включает индикатор выполнения внизу окна (режим неизвестной длительности)."""
@@ -336,7 +341,29 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.logger.info("Коллизий не обнаружено")
 
             # Больше не добавляем демонстрационный объект автоматически (R1 удалён)
-                
+            # После планирования: выбор позиций роботов в 2D-диалоге
+            try:
+                robots = self.plan.get("robots", []) if isinstance(self.plan, dict) else []
+                if robots:
+                    num = len(robots)
+                    tiles = 12
+                    tile_size = 0.5
+                    origin = (-tiles * tile_size / 2.0, -tiles * tile_size / 2.0)
+                    z_plane = 0.0
+                    dlg = PositionSelectorDialog(self, num_robots=num, tiles=tiles, tile_size=tile_size, origin=origin, z_plane=z_plane)
+                    if dlg.exec() == QtWidgets.QDialog.Accepted:
+                        positions = dlg.get_positions()
+                        for idx, pos in enumerate(positions):
+                            try:
+                                if idx < len(robots):
+                                    robots[idx]["base_xyz"] = [float(pos[0]), float(pos[1]), float(pos[2])]
+                            except Exception:
+                                pass
+                        self.plan["robots"] = robots
+                        self.textLog.append("📌 Позиции роботов установлены. Нажмите 'Открыть визуализацию' для просмотра.")
+            except Exception as sel_err:
+                self.logger.warning(f"Не удалось выполнить выбор позиций/запуск визуализации: {sel_err}")
+            
         except Exception as e:
             error_msg = f"❌ Ошибка планировщика: {e}"
             self.textLog.append(error_msg)
@@ -410,6 +437,44 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
             except Exception:
                 viz_mode = "3d_anim"
+
+            # 3D-выбор позиций роботов прямо в сцене Plotly: пользователь ставит R1..RN и сохраняет JSON
+            try:
+                robots = self.plan.get("robots", []) if isinstance(self.plan, dict) else []
+                if robots:
+                    num = len(robots)
+                    # Инструкция по выбору в 3D сцене
+                    QtWidgets.QMessageBox.information(
+                        self,
+                        "Размещение роботов в 3D",
+                        "Сейчас откроется 3D-сцена. Кликните по клеткам, чтобы разместить R1..RN.\n"
+                        "После расстановки нажмите кнопку 'Сохранить позиции роботов' в правом нижнем углу браузера,\n"
+                        "сохраните JSON-файл и затем выберите его в следующем диалоге."
+                    )
+                    # Открываем сцену с доской для размещения
+                    try:
+                        show_visualization(self.plan, "3d")
+                    except Exception as sel_err:
+                        self.logger.warning(f"Не удалось открыть сцену выбора позиций: {sel_err}")
+                    # Вместо выбора файла — вставка из буфера обмена
+                    dlg = PastePositionsDialog(self, expected_count=num)
+                    if dlg.exec() == QtWidgets.QDialog.Accepted:
+                        selections = dlg.get_data() or []
+                        if isinstance(selections, list):
+                            for item in selections:
+                                try:
+                                    ridx = int(item.get("robotIndex", 0))
+                                    if 0 <= ridx < len(robots):
+                                        x = float(item.get("x", 0.0))
+                                        y = float(item.get("y", 0.0))
+                                        z = float(item.get("z", 0.0))
+                                        robots[ridx]["base_xyz"] = [x, y, z]
+                                except Exception:
+                                    pass
+                            self.plan["robots"] = robots
+                            self.textLog.append("📌 Позиции роботов обновлены из 3D-сцены (вставка)")
+            except Exception as pos_err:
+                self.logger.warning(f"Не удалось выполнить интерактивный выбор позиций: {pos_err}")
 
             # Запускаем визуализацию в фоне, чтобы UI не подвисал
             class VizWorker(QtCore.QObject):

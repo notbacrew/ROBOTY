@@ -49,82 +49,58 @@ class InputGeneratorDialog(QtWidgets.QDialog):
         basic_layout.addRow("Safe distance (м):", self.spin_safe)
 
         self.spin_tool = QtWidgets.QDoubleSpinBox()
-        self.spin_tool.setRange(0.0, 5.0)
+        self.spin_tool.setRange(0.0, 2.0)
         self.spin_tool.setDecimals(3)
-        self.spin_tool.setSingleStep(0.05)
+        self.spin_tool.setSingleStep(0.01)
         self.spin_tool.setValue(0.1)
-        basic_layout.addRow("Tool clearance (м):", self.spin_tool)
+        basic_layout.addRow("Tool length (м):", self.spin_tool)
         
         layout.addWidget(basic_group)
 
-        # Настройки пространства
-        space_group = QtWidgets.QGroupBox("🌍 Настройки пространства")
+        # Пространственные параметры
+        space_group = QtWidgets.QGroupBox("📐 Пространственные параметры")
         space_layout = QtWidgets.QFormLayout(space_group)
-        
-        # Размеры пространства
-        self.spin_space_width = QtWidgets.QDoubleSpinBox()
-        self.spin_space_width.setRange(1.0, 1000.0)
-        self.spin_space_width.setDecimals(2)
-        self.spin_space_width.setSingleStep(0.5)
-        self.spin_space_width.setValue(10.0)
-        space_layout.addRow("Ширина пространства (м):", self.spin_space_width)
 
-        self.spin_space_height = QtWidgets.QDoubleSpinBox()
-        self.spin_space_height.setRange(1.0, 1000.0)
-        self.spin_space_height.setDecimals(2)
-        self.spin_space_height.setSingleStep(0.5)
-        self.spin_space_height.setValue(10.0)
-        space_layout.addRow("Высота пространства (м):", self.spin_space_height)
+        self.spin_space_x = QtWidgets.QDoubleSpinBox()
+        self.spin_space_x.setRange(0.1, 50.0)
+        self.spin_space_x.setDecimals(1)
+        self.spin_space_x.setSingleStep(0.5)
+        self.spin_space_x.setValue(6.0)
+        space_layout.addRow("Размер X (м):", self.spin_space_x)
 
-        self.spin_space_depth = QtWidgets.QDoubleSpinBox()
-        self.spin_space_depth.setRange(1.0, 1000.0)
-        self.spin_space_depth.setDecimals(2)
-        self.spin_space_depth.setSingleStep(0.5)
-        self.spin_space_depth.setValue(5.0)
-        space_layout.addRow("Глубина пространства (м):", self.spin_space_depth)
+        self.spin_space_y = QtWidgets.QDoubleSpinBox()
+        self.spin_space_y.setRange(0.1, 50.0)
+        self.spin_space_y.setDecimals(1)
+        self.spin_space_y.setSingleStep(0.5)
+        self.spin_space_y.setValue(6.0)
+        space_layout.addRow("Размер Y (м):", self.spin_space_y)
 
-        # Рекомендации по размерам
-        self.label_recommendations = QtWidgets.QLabel()
-        self.label_recommendations.setWordWrap(True)
-        self.label_recommendations.setStyleSheet("color: #666; font-style: italic;")
-        self.update_recommendations()
-        space_layout.addRow("Рекомендации:", self.label_recommendations)
-        
-        # Подключаем сигналы для обновления рекомендаций
-        self.spin_robots.valueChanged.connect(self.update_recommendations)
-        self.spin_space_width.valueChanged.connect(self.update_recommendations)
-        self.spin_space_height.valueChanged.connect(self.update_recommendations)
-        self.spin_space_depth.valueChanged.connect(self.update_recommendations)
+        self.spin_space_z = QtWidgets.QDoubleSpinBox()
+        self.spin_space_z.setRange(0.1, 20.0)
+        self.spin_space_z.setDecimals(1)
+        self.spin_space_z.setSingleStep(0.1)
+        self.spin_space_z.setValue(3.0)
+        space_layout.addRow("Размер Z (м):", self.spin_space_z)
         
         layout.addWidget(space_group)
 
-        # Расположение роботов
-        robot_group = QtWidgets.QGroupBox("📍 Расположение роботов")
+        # Параметры роботов
+        robot_group = QtWidgets.QGroupBox("🦾 Параметры роботов")
         robot_layout = QtWidgets.QFormLayout(robot_group)
-        
-        self.combo_robot_layout = QtWidgets.QComboBox()
-        self.combo_robot_layout.addItems([
-            "Сетка (автоматически)",
-            "Линия (вдоль X)",
-            "Круг (по окружности)",
-            "Случайно (равномерно)",
-            "Случайно (кластеры)"
-        ])
-        robot_layout.addRow("Способ размещения:", self.combo_robot_layout)
 
-        self.spin_robot_spacing = QtWidgets.QDoubleSpinBox()
-        self.spin_robot_spacing.setRange(0.5, 50.0)
-        self.spin_robot_spacing.setDecimals(2)
-        self.spin_robot_spacing.setSingleStep(0.1)
-        self.spin_robot_spacing.setValue(2.0)
-        robot_layout.addRow("Расстояние между роботами (м):", self.spin_robot_spacing)
+        self.spin_robot_reach = QtWidgets.QDoubleSpinBox()
+        self.spin_robot_reach.setRange(0.1, 10.0)
+        self.spin_robot_reach.setDecimals(2)
+        self.spin_robot_reach.setSingleStep(0.1)
+        self.spin_robot_reach.setValue(1.8)
+        robot_layout.addRow("Радиус действия (м):", self.spin_robot_reach)
 
         self.spin_robot_margin = QtWidgets.QDoubleSpinBox()
-        self.spin_robot_margin.setRange(0.0, 10.0)
+        self.spin_robot_margin.setRange(0.0, 2.0)
         self.spin_robot_margin.setDecimals(2)
-        self.spin_robot_margin.setSingleStep(0.1)
-        self.spin_robot_margin.setValue(1.0)
-        robot_layout.addRow("Отступ от краев (м):", self.spin_robot_margin)
+        self.spin_robot_margin.setSingleStep(0.05)
+        self.spin_robot_margin.setValue(0.2)
+        robot_layout.addRow("Отступ от края (м):", self.spin_robot_margin)
         
         layout.addWidget(robot_group)
 
@@ -169,325 +145,214 @@ class InputGeneratorDialog(QtWidgets.QDialog):
         path_input_layout.addWidget(self.edit_path)
         path_input_layout.addWidget(btn_browse)
         path_layout.addLayout(path_input_layout)
+
+        self.chk_load = QtWidgets.QCheckBox("Загрузить созданный файл в приложение")
+        self.chk_load.setChecked(True)
+        path_layout.addWidget(self.chk_load)
         
         layout.addWidget(path_group)
 
         # Кнопки
-        btns = QtWidgets.QDialogButtonBox()
-        self.btn_generate_load = btns.addButton("Сгенерировать и загрузить", QtWidgets.QDialogButtonBox.AcceptRole)
-        self.btn_generate_save = btns.addButton("Сгенерировать и сохранить", QtWidgets.QDialogButtonBox.ApplyRole)
-        self.btn_cancel = btns.addButton(QtWidgets.QDialogButtonBox.Cancel)
-        layout.addWidget(btns)
-
-        self.btn_generate_load.clicked.connect(lambda: self.on_generate(load_into_app=True))
-        self.btn_generate_save.clicked.connect(lambda: self.on_generate(load_into_app=False))
+        buttons_layout = QtWidgets.QHBoxLayout()
+        
+        self.btn_generate = QtWidgets.QPushButton("🎲 Сгенерировать")
+        self.btn_generate.clicked.connect(self.generate_data)
+        self.btn_generate.setMinimumHeight(40)
+        self.btn_generate.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 10px 20px;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        
+        self.btn_cancel = QtWidgets.QPushButton("❌ Отмена")
         self.btn_cancel.clicked.connect(self.reject)
+        self.btn_cancel.setMinimumHeight(40)
+        
+        buttons_layout.addWidget(self.btn_generate)
+        buttons_layout.addWidget(self.btn_cancel)
+        
+        layout.addLayout(buttons_layout)
 
-        # Результаты
+        # Статус
+        self.status_label = QtWidgets.QLabel("Готов к генерации данных")
+        self.status_label.setStyleSheet("color: #666; font-style: italic;")
+        layout.addWidget(self.status_label)
+
         self.saved_path = None
         self.load_into_app = False
 
-    def update_recommendations(self):
-        """Обновляет рекомендации по размерам пространства"""
-        n_robots = self.spin_robots.value()
-        width = self.spin_space_width.value()
-        height = self.spin_space_height.value()
-        depth = self.spin_space_depth.value()
-        
-        # Рекомендуемые размеры
-        min_robot_spacing = 2.0  # минимальное расстояние между роботами
-        recommended_width = math.ceil(math.sqrt(n_robots)) * min_robot_spacing
-        recommended_height = math.ceil(math.sqrt(n_robots)) * min_robot_spacing
-        
-        # Проверяем, достаточно ли места
-        current_area = width * height
-        recommended_area = recommended_width * recommended_height
-        
-        if current_area < recommended_area:
-            status = "⚠️ Мало места для роботов"
-            color = "#d32f2f"
-        elif current_area < recommended_area * 1.5:
-            status = "✅ Достаточно места"
-            color = "#388e3c"
-        else:
-            status = "✅ Много места"
-            color = "#1976d2"
-        
-        recommendations = f"""
-        <div style="color: {color};">
-        <b>{status}</b><br>
-        Рекомендуемые размеры: {recommended_width:.1f}×{recommended_height:.1f} м<br>
-        Текущая площадь: {current_area:.1f} м²<br>
-        Рекомендуемая площадь: {recommended_area:.1f} м²
-        </div>
-        """
-        
-        self.label_recommendations.setText(recommendations)
-
-    def showEvent(self, event: QtGui.QShowEvent) -> None:
-        # При показе диалога используем только глобальный стиль приложения
-        try:
-            # Сбросим локальный стиль, чтобы наследовать app.setStyleSheet
-            self.setStyleSheet("")
-            # Убедимся, что все дочерние виджеты наследуют стиль
-            for widget in self.findChildren(QtWidgets.QWidget):
-                if hasattr(widget, 'setStyleSheet'):
-                    widget.setStyleSheet("")
-        except Exception:
-            pass
-        return super().showEvent(event)
-
-    def _update_default_ext(self):
+    def _update_default_ext(self, fmt):
+        """Обновляет расширение файла при смене формата"""
         path = self.edit_path.text()
-        if not path:
-            return
-        base, ext = os.path.splitext(path)
-        if self.combo_fmt.currentText() == "JSON":
-            self.edit_path.setText(base + ".json")
-        else:
-            self.edit_path.setText(base + ".txt")
+        base_path = os.path.splitext(path)[0]
+        ext = ".json" if fmt == "JSON" else ".txt"
+        self.edit_path.setText(base_path + ext)
 
     def on_browse(self):
+        """Открывает диалог выбора файла для сохранения"""
         fmt = self.combo_fmt.currentText()
-        filt = "JSON Files (*.json)" if fmt == "JSON" else "Text Files (*.txt)"
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Сохранить входной файл", self.edit_path.text(), filt)
+        ext = "*.json" if fmt == "JSON" else "*.txt"
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, 
+            f"Сохранить {fmt} файл", 
+            self.edit_path.text(),
+            f"{fmt} файлы ({ext});;Все файлы (*.*)"
+        )
         if path:
             self.edit_path.setText(path)
 
-    def on_generate(self, load_into_app: bool):
+    def generate_data(self):
+        """Генерирует входные данные согласно настройкам"""
         try:
-            n_robots = self.spin_robots.value()
-            n_ops = self.spin_ops.value()
+            self.status_label.setText("Генерация данных...")
+            self.status_label.repaint()
+
+            # Получаем параметры
+            num_robots = self.spin_robots.value()
+            num_ops = self.spin_ops.value()
             safe_dist = self.spin_safe.value()
-            tool_clear = self.spin_tool.value()
-            space_width = self.spin_space_width.value()
-            space_height = self.spin_space_height.value()
-            space_depth = self.spin_space_depth.value()
-            robot_spacing = self.spin_robot_spacing.value()
+            tool_length = self.spin_tool.value()
+            
+            space_x = self.spin_space_x.value()
+            space_y = self.spin_space_y.value()
+            space_z = self.spin_space_z.value()
+            
+            robot_reach = self.spin_robot_reach.value()
             robot_margin = self.spin_robot_margin.value()
-            robot_layout = self.combo_robot_layout.currentText()
-            randomize = self.chk_random.isChecked()
-            seed = self.spin_seed.value()
-            if seed == 0:
-                seed = int(datetime.now().timestamp())
+            
+            use_random = self.chk_random.isChecked()
+            seed = self.spin_seed.value() if self.spin_seed.value() > 0 else None
+            
+            if seed:
+                random.seed(seed)
 
-            fmt = self.combo_fmt.currentText()
-            path = self.edit_path.text()
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+            # Генерируем роботов
+            robots = []
+            for i in range(num_robots):
+                if use_random:
+                    x = random.uniform(-space_x/2 + robot_margin, space_x/2 - robot_margin)
+                    y = random.uniform(-space_y/2 + robot_margin, space_y/2 - robot_margin)
+                    z = random.uniform(0.1, space_z * 0.3)
+                else:
+                    # Равномерное распределение по сетке
+                    grid_size = int(math.ceil(math.sqrt(num_robots)))
+                    row = i // grid_size
+                    col = i % grid_size
+                    x = -space_x/2 + robot_margin + (col + 0.5) * (space_x - 2*robot_margin) / grid_size
+                    y = -space_y/2 + robot_margin + (row + 0.5) * (space_y - 2*robot_margin) / grid_size
+                    z = 0.1
 
-            if fmt == "JSON":
-                data = self._build_json(n_robots, n_ops, safe_dist, tool_clear, 
-                                      space_width, space_height, space_depth,
-                                      robot_spacing, robot_margin, robot_layout,
-                                      randomize, seed)
-                with open(path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-            else:
-                content = self._build_txt(n_robots, n_ops, safe_dist, tool_clear,
-                                        space_width, space_height, space_depth,
-                                        robot_spacing, robot_margin, robot_layout,
-                                        randomize, seed)
-                with open(path, 'w', encoding='utf-8') as f:
-                    f.write(content)
+                robot = {
+                    "id": i + 1,
+                    "base_xyz": [round(x, 3), round(y, 3), round(z, 3)],
+                    "reach": round(robot_reach + (random.uniform(-0.1, 0.1) if use_random else 0), 2),
+                    "tool_length": round(tool_length + (random.uniform(-0.02, 0.02) if use_random else 0), 3)
+                }
+                robots.append(robot)
 
-            self.saved_path = path
-            self.load_into_app = load_into_app
-            self.accept()
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Ошибка генерации", f"Не удалось сгенерировать входной файл: {e}")
+            # Генерируем операции
+            operations = []
+            for i in range(num_ops):
+                if use_random:
+                    x = random.uniform(-space_x/2, space_x/2)
+                    y = random.uniform(-space_y/2, space_y/2)
+                    z = random.uniform(0.1, space_z * 0.8)
+                else:
+                    # Равномерное распределение
+                    x = -space_x/2 + (i % int(space_x * 10)) * 0.1
+                    y = -space_y/2 + (i // int(space_x * 10)) * 0.1
+                    z = 0.1 + (i % 20) * 0.1
 
-    @staticmethod
-    def _rng(randomize: bool, seed: int) -> random.Random:
-        rng = random.Random()
-        rng.seed(seed)
-        return rng
+                operation = {
+                    "id": i + 1,
+                    "target_xyz": [round(x, 3), round(y, 3), round(z, 3)],
+                    "duration": round(random.uniform(1.0, 10.0) if use_random else 5.0, 1),
+                    "priority": random.randint(1, 5) if use_random else 3
+                }
+                operations.append(operation)
 
-    def _generate_robot_positions(self, n_robots: int, space_width: float, space_height: float, 
-                                 space_depth: float, robot_spacing: float, robot_margin: float,
-                                 layout_type: str, rng: random.Random) -> list:
-        """Генерирует позиции роботов в зависимости от выбранного типа размещения"""
-        positions = []
-        
-        # Учитываем отступы
-        effective_width = space_width - 2 * robot_margin
-        effective_height = space_height - 2 * robot_margin
-        effective_depth = space_depth - 2 * robot_margin
-        
-        if layout_type == "Сетка (автоматически)":
-            # Автоматическая сетка
-            cols = max(1, int(math.ceil(math.sqrt(n_robots))))
-            rows = int(math.ceil(n_robots / cols))
-            
-            step_x = effective_width / max(1, cols - 1) if cols > 1 else 0
-            step_y = effective_height / max(1, rows - 1) if rows > 1 else 0
-            
-            for i in range(n_robots):
-                row = i // cols
-                col = i % cols
-                x = robot_margin + col * step_x
-                y = robot_margin + row * step_y
-                z = robot_margin + rng.uniform(0, effective_depth) if effective_depth > 0 else robot_margin
-                positions.append((round(x, 3), round(y, 3), round(z, 3)))
-                
-        elif layout_type == "Линия (вдоль X)":
-            # Линия вдоль X
-            step_x = effective_width / max(1, n_robots - 1) if n_robots > 1 else 0
-            for i in range(n_robots):
-                x = robot_margin + i * step_x
-                y = robot_margin + effective_height / 2
-                z = robot_margin + rng.uniform(0, effective_depth) if effective_depth > 0 else robot_margin
-                positions.append((round(x, 3), round(y, 3), round(z, 3)))
-                
-        elif layout_type == "Круг (по окружности)":
-            # Круг
-            radius = min(effective_width, effective_height) / 2 - robot_spacing
-            center_x = robot_margin + effective_width / 2
-            center_y = robot_margin + effective_height / 2
-            
-            for i in range(n_robots):
-                angle = 2 * math.pi * i / n_robots
-                x = center_x + radius * math.cos(angle)
-                y = center_y + radius * math.sin(angle)
-                z = robot_margin + rng.uniform(0, effective_depth) if effective_depth > 0 else robot_margin
-                positions.append((round(x, 3), round(y, 3), round(z, 3)))
-                
-        elif layout_type == "Случайно (равномерно)":
-            # Случайное равномерное распределение
-            for i in range(n_robots):
-                x = robot_margin + rng.uniform(0, effective_width)
-                y = robot_margin + rng.uniform(0, effective_height)
-                z = robot_margin + rng.uniform(0, effective_depth) if effective_depth > 0 else robot_margin
-                positions.append((round(x, 3), round(y, 3), round(z, 3)))
-                
-        elif layout_type == "Случайно (кластеры)":
-            # Случайные кластеры
-            n_clusters = max(1, n_robots // 3)
-            cluster_size = n_robots // n_clusters
-            
-            for cluster in range(n_clusters):
-                cluster_x = robot_margin + rng.uniform(0, effective_width)
-                cluster_y = robot_margin + rng.uniform(0, effective_height)
-                cluster_z = robot_margin + rng.uniform(0, effective_depth) if effective_depth > 0 else robot_margin
-                
-                cluster_robots = cluster_size if cluster < n_clusters - 1 else n_robots - cluster * cluster_size
-                for i in range(cluster_robots):
-                    x = cluster_x + rng.gauss(0, robot_spacing / 2)
-                    y = cluster_y + rng.gauss(0, robot_spacing / 2)
-                    z = cluster_z + rng.gauss(0, robot_spacing / 2)
-                    
-                    # Ограничиваем в пределах пространства
-                    x = max(robot_margin, min(robot_margin + effective_width, x))
-                    y = max(robot_margin, min(robot_margin + effective_height, y))
-                    z = max(robot_margin, min(robot_margin + effective_depth, z))
-                    
-                    positions.append((round(x, 3), round(y, 3), round(z, 3)))
-        
-        return positions
-
-    def _build_json(self, n_robots: int, n_ops: int, safe_dist: float, tool_clear: float,
-                   space_width: float, space_height: float, space_depth: float,
-                   robot_spacing: float, robot_margin: float, layout_type: str,
-                   randomize: bool, seed: int) -> dict:
-        rng = self._rng(randomize, seed)
-        
-        # Генерируем позиции роботов
-        robot_positions = self._generate_robot_positions(
-            n_robots, space_width, space_height, space_depth,
-            robot_spacing, robot_margin, layout_type, rng
-        )
-        
-        # Создаем роботов
-        robots = []
-        for i, pos in enumerate(robot_positions, 1):
-            vbase = 1.0 + (rng.uniform(-0.3, 0.5) if randomize else 0.0)
-            abase = 2.0 + (rng.uniform(-0.5, 0.8) if randomize else 0.0)
-            robots.append({
-                "id": i,
-                "base_xyz": list(pos),
-                "joint_limits": [[-180, 180], [-90, 90], [-90, 90], [-180, 180], [-90, 90], [-90, 90]],
-                "vmax": [round(vbase, 2)] * 6,
-                "amax": [round(abase, 2)] * 6,
-                "tool_clearance": round(tool_clear, 3)
-            })
-        
-        # Генерируем операции в пределах пространства
-        operations = []
-        for i in range(n_ops):
-            # Случайные точки в пределах пространства
-            pick_x = rng.uniform(robot_margin, robot_margin + space_width - robot_margin)
-            pick_y = rng.uniform(robot_margin, robot_margin + space_height - robot_margin)
-            pick_z = rng.uniform(robot_margin, robot_margin + space_depth - robot_margin)
-            
-            place_x = rng.uniform(robot_margin, robot_margin + space_width - robot_margin)
-            place_y = rng.uniform(robot_margin, robot_margin + space_height - robot_margin)
-            place_z = rng.uniform(robot_margin, robot_margin + space_depth - robot_margin)
-            
-            pick = [round(pick_x, 3), round(pick_y, 3), round(pick_z, 3)]
-            place = [round(place_x, 3), round(place_y, 3), round(place_z, 3)]
-            t_hold = round(0.4 + (rng.random() * 0.8 if randomize else 0.6), 2)
-            
-            operations.append({
-                "id": i + 1,
-                "pick_xyz": pick,
-                "place_xyz": place,
-                "t_hold": t_hold
-            })
-        
-        return {
-            "robots": robots,
-            "safe_dist": round(safe_dist, 3),
-            "operations": operations,
-            "space_settings": {
-                "width": space_width,
-                "height": space_height,
-                "depth": space_depth,
-                "robot_layout": layout_type
+            # Создаем структуру данных
+            data = {
+                "robots": robots,
+                "operations": operations,
+                "safe_distance": safe_dist,
+                "space_bounds": {
+                    "x_min": -space_x/2,
+                    "x_max": space_x/2,
+                    "y_min": -space_y/2,
+                    "y_max": space_y/2,
+                    "z_min": 0.0,
+                    "z_max": space_z
+                },
+                "generation_params": {
+                    "num_robots": num_robots,
+                    "num_operations": num_ops,
+                    "use_random": use_random,
+                    "seed": seed,
+                    "generated_at": datetime.now().isoformat()
+                }
             }
-        }
 
-    def _build_txt(self, n_robots: int, n_ops: int, safe_dist: float, tool_clear: float,
-                  space_width: float, space_height: float, space_depth: float,
-                  robot_spacing: float, robot_margin: float, layout_type: str,
-                  randomize: bool, seed: int) -> str:
-        rng = self._rng(randomize, seed)
-        
-        # Генерируем позиции роботов
-        robot_positions = self._generate_robot_positions(
-            n_robots, space_width, space_height, space_depth,
-            robot_spacing, robot_margin, layout_type, rng
-        )
-        
-        lines = []
-        # K N
-        lines.append(f"{n_robots} {n_ops}")
-        
-        # Позиции роботов
-        for (x, y, z) in robot_positions:
-            lines.append(f"{x} {y} {z}")
-        
-        # 6 строк ограничений суставов
-        for j in range(6):
-            jmin, jmax = -180.0 if j in (0, 3) else -90.0, 180.0 if j in (0, 3) else 90.0
-            vmax = 1.0 + (rng.uniform(-0.3, 0.5) if randomize else 0.0)
-            amax = 2.0 + (rng.uniform(-0.5, 0.8) if randomize else 0.0)
-            lines.append(f"{jmin} {jmax} {round(vmax,2)} {round(amax,2)}")
-        
-        # Tool_clearance Safe_dist
-        lines.append(f"{round(tool_clear,3)} {round(safe_dist,3)}")
-        
-        # Операции в пределах пространства
-        for i in range(n_ops):
-            pick_x = rng.uniform(robot_margin, robot_margin + space_width - robot_margin)
-            pick_y = rng.uniform(robot_margin, robot_margin + space_height - robot_margin)
-            pick_z = rng.uniform(robot_margin, robot_margin + space_depth - robot_margin)
+            # Сохраняем файл
+            output_path = self.edit_path.text()
+            fmt = self.combo_fmt.currentText()
             
-            place_x = rng.uniform(robot_margin, robot_margin + space_width - robot_margin)
-            place_y = rng.uniform(robot_margin, robot_margin + space_height - robot_margin)
-            place_z = rng.uniform(robot_margin, robot_margin + space_depth - robot_margin)
+            if fmt == "JSON":
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+            else:  # TXT
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(f"# ROBOTY Input File\n")
+                    f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                    
+                    f.write(f"ROBOTS {num_robots}\n")
+                    f.write(f"OPERATIONS {num_ops}\n")
+                    f.write(f"SAFE_DISTANCE {safe_dist}\n")
+                    f.write(f"SPACE_X {space_x}\n")
+                    f.write(f"SPACE_Y {space_y}\n")
+                    f.write(f"SPACE_Z {space_z}\n\n")
+                    
+                    f.write("# Robots\n")
+                    for robot in robots:
+                        f.write(f"ROBOT {robot['id']} {robot['base_xyz'][0]} {robot['base_xyz'][1]} {robot['base_xyz'][2]} {robot['reach']} {robot['tool_length']}\n")
+                    
+                    f.write("\n# Operations\n")
+                    for op in operations:
+                        f.write(f"OPERATION {op['id']} {op['target_xyz'][0]} {op['target_xyz'][1]} {op['target_xyz'][2]} {op['duration']} {op['priority']}\n")
+
+            self.saved_path = output_path
+            self.load_into_app = self.chk_load.isChecked()
             
-            px, py, pz = round(pick_x, 3), round(pick_y, 3), round(pick_z, 3)
-            qx, qy, qz = round(place_x, 3), round(place_y, 3), round(place_z, 3)
-            t_i = round(0.4 + (rng.random() * 0.8 if randomize else 0.6), 2)
-            lines.append(f"{px} {py} {pz} {qx} {qy} {qz} {t_i}")
-        
-        return "\n".join(lines) + "\n"
+            self.status_label.setText(f"✅ Данные сохранены: {os.path.basename(output_path)}")
+            self.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            
+            # Показываем информацию о созданных данных
+            info_text = f"""
+Создано:
+• Роботов: {num_robots}
+• Операций: {num_ops}
+• Размер пространства: {space_x}×{space_y}×{space_z} м
+• Safe distance: {safe_dist} м
+• Формат: {fmt}
+• Файл: {os.path.basename(output_path)}
+            """.strip()
+            
+            QtWidgets.QMessageBox.information(self, "Генерация завершена", info_text)
+            self.accept()
+
+        except Exception as e:
+            error_msg = f"Ошибка генерации: {str(e)}"
+            self.status_label.setText(error_msg)
+            self.status_label.setStyleSheet("color: #f44336; font-weight: bold;")
+            QtWidgets.QMessageBox.critical(self, "Ошибка", error_msg)

@@ -1,6 +1,6 @@
-PySide6
+# Минимальные зависимости для ROBOTY
 numpy
-scipy
 matplotlib
 plotly
 pandas
+psutil

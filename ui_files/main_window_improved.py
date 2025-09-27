@@ -219,6 +219,51 @@ class Ui_MainWindow(object):
         self.pushButton_viz.setMinimumHeight(35)
         self.horizontalLayout_control.addWidget(self.pushButton_viz)
         
+        # Кнопка проверки мощности системы
+        self.pushButton_check_perf = QPushButton(self.groupBox_control)
+        self.pushButton_check_perf.setObjectName(u"pushButton_check_perf")
+        self.pushButton_check_perf.setText("⚙️ Проверка мощности")
+        self.pushButton_check_perf.setMinimumHeight(35)
+        self.pushButton_check_perf.setToolTip("Оценить производительность системы и рекомендовать модель руки")
+        self.pushButton_check_perf.setStyleSheet("""
+            QPushButton {
+                background-color: #1976D2;
+                color: white;
+                border-radius: 6px;
+                padding: 8px 14px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #125A9C;
+            }
+        """)
+        self.horizontalLayout_control.addWidget(self.pushButton_check_perf)
+
+        # Кнопка запуска десктопного приложения
+        self.pushButton_desktop_app = QPushButton(self.groupBox_control)
+        self.pushButton_desktop_app.setObjectName(u"pushButton_desktop_app")
+        self.pushButton_desktop_app.setText("🖥️ Native 3D")
+        self.pushButton_desktop_app.setMinimumHeight(35)
+        self.pushButton_desktop_app.setToolTip("Открыть нативную 3D визуализацию с OpenGL")
+        self.pushButton_desktop_app.setStyleSheet("""
+            QPushButton {
+                background-color: #FF6B35;
+                color: white;
+                border-radius: 6px;
+                padding: 8px 14px;
+                font-weight: 600;
+                border: 2px solid #E55A2B;
+            }
+            QPushButton:hover {
+                background-color: #E55A2B;
+                border-color: #D14A1B;
+            }
+            QPushButton:pressed {
+                background-color: #D14A1B;
+            }
+        """)
+        self.horizontalLayout_control.addWidget(self.pushButton_desktop_app)
+
         # Отступ
         self.horizontalSpacer_control = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.horizontalLayout_control.addItem(self.horizontalSpacer_control)

@@ -5,7 +5,6 @@ import os
 from datetime import datetime
 from ui_files.main_window_improved import Ui_MainWindow
 from ui_files.input_generator_dialog import InputGeneratorDialog
-from ui_files.position_selector import PositionSelectorDialog
 from ui_files.styles_final import get_light_style, get_dark_style, get_colors
 from core.parser import parse_input_file
 from core.planner import run_planner_algorithm
@@ -74,12 +73,25 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pushButton_viz.clicked.connect(self.open_visualizer)
         self.pushButton_save.clicked.connect(self.save_result)
         self.pushButton_clear_logs.clicked.connect(self.clear_logs)
+        # Кнопка проверки мощности
+        try:
+            if hasattr(self, 'pushButton_check_perf'):
+                self.pushButton_check_perf.clicked.connect(self.check_system_performance)
+        except Exception:
+            pass
         
         # Подключение кнопки генерации входных данных
         try:
             self.pushButton_input_gen.clicked.connect(self.open_input_generator)
         except Exception as e:
             self.logger.error(f"Не удалось подключить кнопку генератора входных данных: {e}")
+        
+        # Подключение кнопки десктопного приложения
+        try:
+            if hasattr(self, 'pushButton_desktop_app'):
+                self.pushButton_desktop_app.clicked.connect(self.launch_desktop_app)
+        except Exception as e:
+            self.logger.error(f"Не удалось подключить кнопку десктопного приложения: {e}")
         
         # Подключение сигналов для обновления интерфейса
         self.comboBox_assignment_method.currentTextChanged.connect(self.update_genetic_controls)
@@ -125,12 +137,15 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         except Exception:
             self.logger.warning("Не удалось привязать синхронизацию видимости селектора модели")
 
-        # Хранилище фоновой задачи визуализации
+        # Хранилище фоновых задач
         self._viz_thread = None
         self._viz_worker = None
-        # Сerver for 3D selection apply (отключено)
-        self._sel_server = None
-        self._sel_thread = None
+        self._desktop_viz_thread = None
+        self._desktop_viz_worker = None
+        
+        # Хранилище десктопного приложения
+        self.desktop_window = None
+        self.desktop_3d_window = None
 
     def show_busy(self, message: str = "Загрузка..."):
         """Включает индикатор выполнения внизу окна (режим неизвестной длительности)."""
@@ -340,29 +355,7 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.logger.info("Коллизий не обнаружено")
 
             # Больше не добавляем демонстрационный объект автоматически (R1 удалён)
-            # После планирования: выбор позиций роботов в 2D-диалоге
-            try:
-                robots = self.plan.get("robots", []) if isinstance(self.plan, dict) else []
-                if robots:
-                    num = len(robots)
-                    tiles = 12
-                    tile_size = 0.5
-                    origin = (-tiles * tile_size / 2.0, -tiles * tile_size / 2.0)
-                    z_plane = 0.0
-                    dlg = PositionSelectorDialog(self, num_robots=num, tiles=tiles, tile_size=tile_size, origin=origin, z_plane=z_plane)
-                    if dlg.exec() == QtWidgets.QDialog.Accepted:
-                        positions = dlg.get_positions()
-                        for idx, pos in enumerate(positions):
-                            try:
-                                if idx < len(robots):
-                                    robots[idx]["base_xyz"] = [float(pos[0]), float(pos[1]), float(pos[2])]
-                            except Exception:
-                                pass
-                        self.plan["robots"] = robots
-                        self.textLog.append("📌 Позиции роботов установлены. Нажмите 'Открыть визуализацию' для просмотра.")
-            except Exception as sel_err:
-                self.logger.warning(f"Не удалось выполнить выбор позиций/запуск визуализации: {sel_err}")
-            
+                
         except Exception as e:
             error_msg = f"❌ Ошибка планировщика: {e}"
             self.textLog.append(error_msg)
@@ -394,6 +387,26 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
                     self.plan["arm_mesh"] = bool(self.get_arm_mesh_enabled())
                     if self.plan["arm_mesh"]:
                         self.plan.setdefault("arm_style", "realistic")  # более реалистичные звенья по умолчанию
+                
+                # Автоматически включаем 3D модели роботов только для небольших сцен
+                if isinstance(self.plan, dict):
+                    robots = self.plan.get("robots", [])
+                    n_robots = len(robots)
+                    
+                    # Для больших сцен (6+ роботов) отключаем 3D модели по умолчанию
+                    if n_robots >= 6:
+                        self.plan["robot_mesh"] = None  # Отключаем 3D модели
+                        self.plan["arm_mesh"] = True    # Используем простые сегменты
+                        self.plan.setdefault("max_anim_frames", 100)
+                        self.plan.setdefault("anim_time_stride", 0.15)
+                        self.textLog.append("🚀 Большая сцена - используем простые сегменты вместо 3D моделей")
+                    else:
+                        # Для небольших сцен используем быструю модель
+                        if "robot_mesh" not in self.plan:
+                            self.plan["robot_mesh"] = {"path": "assets/robots/hand_simple.obj", "scale": 1.0}
+                            self.plan.setdefault("max_anim_frames", 150)
+                            self.plan.setdefault("anim_time_stride", 0.1)
+                            self.plan.setdefault("light_mesh_anim", True)
                     # Автоподключение внешнего описания хватателя, если доступно (Windows путь из сообщения)
                     try:
                         import os
@@ -406,37 +419,85 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 if hasattr(self, 'get_robot_model_enabled') and hasattr(self, 'get_robot_model_selection') and isinstance(self.plan, dict):
                     if bool(self.get_robot_model_enabled()):
                         selection = self.get_robot_model_selection()
-                        # Независимо от выбора стандартного названия, всегда используем пользовательскую модель
-                        self.plan["robot_mesh"] = {"path": "1758706684_68d3bbfcdbb32.obj", "scale": 1.0}
+                        # Выбираем модель в зависимости от выбора пользователя
+                        if "hand_auto_optimized" in str(selection).lower():
+                            self.plan["robot_mesh"] = {"path": "assets/robots/hand_auto_optimized.obj", "scale": 1.0}
+                            self.plan.setdefault("max_anim_frames", 220)  # более строгий лимит кадров
+                        elif "hand_ultra_simple" in str(selection).lower():
+                            self.plan["robot_mesh"] = {"path": "assets/robots/hand_ultra_simple.obj", "scale": 1.0}
+                            self.plan.setdefault("max_anim_frames", 240)  # не превышать 240 кадров
+                        elif "hand_optimized" in str(selection).lower():
+                            self.plan["robot_mesh"] = {"path": "assets/robots/hand_optimized.obj", "scale": 1.0}
+                            self.plan.setdefault("max_anim_frames", 200)  # строгий лимит
+                        elif "hand_simple" in str(selection).lower():
+                            self.plan["robot_mesh"] = {"path": "assets/robots/hand_simple.obj", "scale": 1.0}
+                            self.plan.setdefault("max_anim_frames", 160)  # минимальный лимит для простых сцен
+                        else:
+                            # Оригинальная тяжелая модель - используем очень агрессивные настройки
+                            self.plan["robot_mesh"] = {"path": "1758706684_68d3bbfcdbb32.obj", "scale": 1.0}
+                            self.plan.setdefault("max_anim_frames", 80)  # очень мало кадров для тяжелой модели
+                        
                         # Ускоряем анимацию по умолчанию для тяжёлых мешей
-                        self.plan.setdefault("max_anim_frames", 240)
-                        self.plan.setdefault("anim_time_stride", 0.05)
+                        self.plan.setdefault("anim_time_stride", 0.15)  # еще больший шаг для скорости
+                        # Включаем лёгкий режим анимации мешей (без пересчёта на каждый кадр)
+                        self.plan.setdefault("light_mesh_anim", True)
                         # Отключаем сегментные меш-руки, чтобы не дублировать геометрию
                         self.plan["arm_mesh"] = False
+                # Специальная оптимизация для тяжелой модели - ОТКЛЮЧАЕМ ЕЕ ПОЛНОСТЬЮ
+                robot_mesh_path = self.plan.get("robot_mesh", {}).get("path", "")
+                if robot_mesh_path:
+                    try:
+                        from core.mesh_loader import is_heavy_mesh
+                        if is_heavy_mesh(robot_mesh_path):
+                            self.textLog.append("⚠️ Обнаружена тяжелая 3D модель - ОТКЛЮЧАЕМ для экономии памяти")
+                            self.plan["robot_mesh"] = None  # Полностью отключаем тяжелую модель
+                            self.plan["arm_mesh"] = True    # Используем простые сегменты
+                            self.plan["max_anim_frames"] = 80
+                            self.plan["anim_time_stride"] = 0.2
+                    except ImportError:
+                        # Fallback для старой проверки
+                        if "1758706684_68d3bbfcdbb32.obj" in str(robot_mesh_path):
+                            self.textLog.append("⚠️ Обнаружена тяжелая 3D модель - ОТКЛЮЧАЕМ для экономии памяти")
+                            self.plan["robot_mesh"] = None
+                            self.plan["arm_mesh"] = True
+                            self.plan["max_anim_frames"] = 80
+                            self.plan["anim_time_stride"] = 0.2
+                
                 # Текстовые предупреждения о нагрузке
                 if self.plan.get("arm_mesh") or self.plan.get("robot_mesh"):
                     self.textLog.append("⚠️ Внимание: Включена 3D рука/модель. Это может значительно нагрузить систему и увеличить время загрузки визуализации.")
                     self.statusbar.showMessage("⚠️ 3D визуализация может загружаться дольше из-за высокой детализации")
-                # Применяем эвристики производительности под число роботов
+                
+                # Предупреждение о размере файла
+                n_robots = len(self.plan.get("robots", []))
+                max_frames = self.plan.get("max_anim_frames", 50)
+                if n_robots >= 6:
+                    self.textLog.append(f"💾 Большая сцена ({n_robots} роботов, {max_frames} кадров) - HTML файл может быть большим")
+                    self.textLog.append("💡 Для ускорения используйте меньше роботов или отключите 3D модели")
+                # Применяем эвристики производительности под число роботов - АГРЕССИВНЫЕ НАСТРОЙКИ
                 robots = self.plan.get("robots", []) if isinstance(self.plan, dict) else []
                 n = len(robots)
-                if n >= 8:
-                    self.plan.setdefault("max_anim_frames", 240)
-                    self.plan.setdefault("anim_time_stride", 0.05)
-                    self.plan.setdefault("arm_segments", 5)
-                if n >= 15:
-                    # Более агрессивные настройки
-                    self.plan["max_anim_frames"] = min(int(self.plan.get("max_anim_frames", 240)), 200)
-                    self.plan["anim_time_stride"] = max(float(self.plan.get("anim_time_stride", 0.05)), 0.06)
-                    self.plan["arm_segments"] = min(int(self.plan.get("arm_segments", 5)), 4)
-                if n >= 25:
-                    # Очень большая сцена: отключить внешние меши, если не задано явно
-                    if "robot_mesh" not in self.plan:
+                if n >= 4:
+                    # Для 4+ роботов используем агрессивные настройки
+                    self.plan.setdefault("max_anim_frames", 80)
+                    self.plan.setdefault("anim_time_stride", 0.15)
+                    self.plan.setdefault("arm_segments", 3)
+                if n >= 6:
+                    # Для 6+ роботов еще более агрессивные настройки
+                    self.plan["max_anim_frames"] = min(int(self.plan.get("max_anim_frames", 80)), 60)
+                    self.plan["anim_time_stride"] = max(float(self.plan.get("anim_time_stride", 0.15)), 0.2)
+                    self.plan["arm_segments"] = min(int(self.plan.get("arm_segments", 3)), 2)
+                if n >= 10:
+                    # Для 10+ роботов отключаем 3D модели и минимизируем кадры
+                    if "robot_mesh" in self.plan and self.plan["robot_mesh"]:
                         self.plan["robot_mesh"] = None
+                        self.plan["arm_mesh"] = True  # Используем простые сегменты
+                    self.plan["max_anim_frames"] = 40
+                    self.plan["anim_time_stride"] = 0.3
+                    self.plan["arm_segments"] = 2
 
             except Exception:
                 viz_mode = "3d_anim"
-
 
             # Запускаем визуализацию в фоне, чтобы UI не подвисал
             class VizWorker(QtCore.QObject):
@@ -673,6 +734,105 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
         except Exception as e:
             self.logger.error(f"Ошибка при показе диалога 'О программе': {e}")
 
+    def check_system_performance(self):
+        """Быстрый бенчмарк CPU/NumPy и рекомендация по модели руки."""
+        try:
+            import time
+            import numpy as np
+            self.show_busy("Оценка производительности...")
+            self.textLog.append("⚙️ Запускаем быстрый бенчмарк системы...")
+
+            # Тёплый запуск NumPy
+            _ = np.dot(np.random.rand(64, 64), np.random.rand(64, 64))
+
+            # Основной тест: несколько матричных перемножений и синусов
+            rng = np.random.default_rng(123)
+            n = 256
+            A = rng.random((n, n), dtype=np.float64)
+            B = rng.random((n, n), dtype=np.float64)
+
+            t0 = time.perf_counter()
+            C = A @ B
+            s = np.sin(C).sum()
+            t1 = time.perf_counter()
+
+            # Дополнительные операции
+            D = rng.random((n, n), dtype=np.float64)
+            E = C * D + 0.123
+            s2 = np.cos(E).mean()
+            t2 = time.perf_counter()
+
+            mul_time = (t1 - t0)
+            extra_time = (t2 - t1)
+            total_time = (t2 - t0)
+
+            # Грубая оценка GFLOPS для n x n умножения (2*n^3 операций)
+            gflops = (2.0 * (n ** 3)) / (mul_time * 1e9) if mul_time > 1e-9 else 0.0
+
+            # Правила рекомендации по времени/производительности
+            # Пороговые значения подобраны эмпирически
+            if total_time <= 0.40 or gflops >= 20:
+                rec = {
+                    "name": "hand_auto_optimized.obj",
+                    "vertices": 239,
+                    "path": "assets/robots/hand_auto_optimized.obj",
+                    "comment": "Система быстрая: можно использовать детальнее"
+                }
+            elif total_time <= 0.80 or gflops >= 10:
+                rec = {
+                    "name": "hand_optimized.obj",
+                    "vertices": 92,
+                    "path": "assets/robots/hand_optimized.obj",
+                    "comment": "Сбалансированная рекомендация"
+                }
+            else:
+                rec = {
+                    "name": "hand_simple.obj",
+                    "vertices": 36,
+                    "path": "assets/robots/hand_simple.obj",
+                    "comment": "Система медленная: рекомендуем минимальную модель"
+                }
+
+            msg = (
+                f"⚙️ Результаты бенчмарка:\n"
+                f"  - n={n}, матричное умножение: {mul_time*1000:.1f} мс ({gflops:.1f} GFLOPS)\n"
+                f"  - доп. операции: {extra_time*1000:.1f} мс\n"
+                f"  - суммарно: {total_time*1000:.1f} мс\n"
+                f"🏷️ Рекомендация: {rec['name']} ({rec['vertices']} вершин) — {rec['comment']}\n"
+                f"   Путь: {rec['path']}\n"
+                f"   Альтернативы: hand_optimized.obj (92), hand_auto_optimized.obj (239)"
+            )
+            self.textLog.append(msg)
+            try:
+                QtWidgets.QMessageBox.information(self, "Рекомендация по модели", msg)
+            except Exception:
+                pass
+
+            # Записываем в логгер
+            self.logger.info(msg.replace("\n", " | "))
+
+            # Можно сразу подставить выбор (без включения 3D по умолчанию)
+            try:
+                if hasattr(self, 'comboBox_robot_model'):
+                    # Добавим варианты если их нет
+                    items = [self.comboBox_robot_model.itemText(i).lower() for i in range(self.comboBox_robot_model.count())]
+                    for label, fname in (("HAND AUTO OPTIMIZED", "hand_auto_optimized"), ("HAND OPTIMIZED", "hand_optimized"), ("HAND SIMPLE", "hand_simple")):
+                        if all(fname not in it for it in items):
+                            self.comboBox_robot_model.addItem(label)
+                    # Выберем подходящее имя
+                    target = "HAND SIMPLE" if rec['vertices'] <= 36 else ("HAND OPTIMIZED" if rec['vertices'] <= 92 else "HAND AUTO OPTIMIZED")
+                    idx = self.comboBox_robot_model.findText(target)
+                    if idx >= 0:
+                        self.comboBox_robot_model.setCurrentIndex(idx)
+            except Exception:
+                pass
+
+        except Exception as e:
+            self.textLog.append(f"❌ Ошибка бенчмарка: {e}")
+            self.logger.error(f"Ошибка бенчмарка: {e}")
+        finally:
+            self.hide_busy()
+
     def open_input_generator(self):
         """Открывает окно генерации входных данных и при необходимости загружает файл"""
         try:
@@ -705,6 +865,56 @@ class MainApp(QtWidgets.QMainWindow, Ui_MainWindow):
             error_msg = f"Ошибка генератора входных данных: {e}"
             self.textLog.append(error_msg)
             self.logger.error(error_msg, exc_info=True)
+
+    def launch_desktop_app(self):
+        """Запускает десктопное 3D окно для визуализации"""
+        try:
+            self.logger.info("Запуск десктопного 3D Viewer")
+            self.textLog.append("🖥️ Запуск десктопного 3D Viewer...")
+            
+            if not self.plan:
+                self.textLog.append("❌ Нет плана для визуализации. Сначала запустите планировщик.")
+                self.logger.warning("Попытка запуска 3D Viewer без плана")
+                return
+            
+            # Импортируем и запускаем десктопный 3D Viewer
+            from ui_files.desktop_3d_viewer import Desktop3DViewer
+            
+            # Создаем новое окно десктопного 3D Viewer
+            self.desktop_3d_window = Desktop3DViewer(self.plan)
+            
+            # Показываем 3D Viewer
+            self.desktop_3d_window.show()
+            
+            self.textLog.append("✅ Десктопный 3D Viewer запущен в отдельном окне")
+            self.textLog.append("🎮 3D визуализация загружается в десктопном приложении")
+            self.logger.info("Десктопный 3D Viewer успешно запущен")
+            
+        except Exception as e:
+            error_msg = f"❌ Ошибка запуска 3D Viewer: {e}"
+            self.textLog.append(error_msg)
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Показываем диалог с ошибкой
+            QtWidgets.QMessageBox.critical(
+                self, 
+                "Ошибка запуска", 
+                f"Не удалось запустить 3D Viewer:\n{e}\n\nУбедитесь, что все зависимости установлены."
+            )
+    
+    @QtCore.Slot(int)
+    def _on_desktop_viz_progress(self, value: int):
+        """Обработка прогресса десктопной визуализации"""
+        try:
+            if hasattr(self, 'progressBar_bottom'):
+                self.progressBar_bottom.setRange(0, 100)
+                self.progressBar_bottom.setValue(value)
+                self.progressBar_bottom.repaint()
+            if hasattr(self, 'labelProgress_bottom'):
+                self.labelProgress_bottom.setText(f"Десктопная визуализация: {value}%")
+            QtWidgets.QApplication.processEvents()
+        except Exception:
+            pass
 
     def setup_theme_toggle(self):
         """Настраивает переключатель темы"""

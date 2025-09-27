@@ -5,12 +5,22 @@ from typing import List, Tuple, Optional
 
 logger = logging.getLogger("ROBOTY.mesh_loader")
 
+# Кэш для загруженных мешей
+_mesh_cache = {}
+
 
 def load_obj(filepath: str, scale: float = 1.0) -> Optional[Tuple[List[float], List[float], List[float], List[int], List[int], List[int]]]:
     """
     Простейший загрузчик OBJ (только v и f с треугольниками),
     возвращает вершины (x,y,z) и индексы (i,j,k) для Mesh3d.
+    Использует кэширование для ускорения повторных загрузок.
     """
+    # Проверяем кэш
+    cache_key = f"{filepath}_{scale}"
+    if cache_key in _mesh_cache:
+        logger.info(f"Используем кэшированный меш: {filepath}")
+        return _mesh_cache[cache_key]
+    
     try:
         if not os.path.isfile(filepath):
             logger.warning(f"OBJ файл не найден: {filepath}")
@@ -52,11 +62,48 @@ def load_obj(filepath: str, scale: float = 1.0) -> Optional[Tuple[List[float], L
         is_ = [f[0] for f in faces]
         js_ = [f[1] for f in faces]
         ks_ = [f[2] for f in faces]
-        logger.info(f"OBJ загружен: {filepath}, вершин={len(vertices)}, треугольников={len(faces)}")
-        return xs, ys, zs, is_, js_, ks_
+        
+        result = (xs, ys, zs, is_, js_, ks_)
+        
+        # Сохраняем в кэш
+        _mesh_cache[cache_key] = result
+        
+        logger.info(f"OBJ загружен и кэширован: {filepath}, вершин={len(vertices)}, треугольников={len(faces)}")
+        return result
     except Exception as e:
         logger.error(f"Ошибка чтения OBJ {filepath}: {e}")
         return None
+
+
+def clear_mesh_cache():
+    """Очищает кэш загруженных мешей для освобождения памяти"""
+    global _mesh_cache
+    _mesh_cache.clear()
+    logger.info("Кэш мешей очищен")
+
+
+def get_mesh_cache_size():
+    """Возвращает количество загруженных мешей в кэше"""
+    return len(_mesh_cache)
+
+
+def is_heavy_mesh(filepath: str) -> bool:
+    """Проверяет, является ли меш тяжелым (больше 10000 вершин)"""
+    try:
+        if not os.path.isfile(filepath):
+            return False
+        
+        vertex_count = 0
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if line.strip().startswith('v '):
+                    vertex_count += 1
+                    if vertex_count > 10000:  # Порог для тяжелого меша
+                        return True
+        
+        return vertex_count > 10000
+    except Exception:
+        return False
 
 
 

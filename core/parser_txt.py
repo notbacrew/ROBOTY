@@ -47,6 +47,117 @@ class ScenarioTxt:
         self.operations = operations
 
 
+def parse_txt_content(content: str) -> Optional[ScenarioTxt]:
+    """
+    Парсит TXT содержимое в формате ТЗ с обработкой ошибок.
+    Формат:
+    K N
+    J1_x J1_y J1_z
+    ...
+    Tool_clearance Safe_dist
+    Px_pick Py_pick Pz_pick Px_place Py_place Pz_place t_i
+    ...
+    """
+    try:
+        logger.info("Начинаем парсинг TXT содержимого")
+        lines = [line.strip() for line in content.split('\n') if line.strip() and not line.strip().startswith('#')]
+        
+        if not lines:
+            raise ValueError("Содержимое пусто или содержит только комментарии")
+        
+        logger.debug(f"Загружено {len(lines)} строк из содержимого")
+        
+        # 1. K N
+        try:
+            K, N = map(int, lines[0].split())
+            logger.debug(f"Количество роботов: {K}, операций: {N}")
+        except (ValueError, IndexError) as e:
+            logger.error(f"Ошибка в первой строке (K N): {e}")
+            raise ValueError("Некорректный формат первой строки. Ожидается: K N")
+        
+        if K <= 0 or N < 0:
+            raise ValueError(f"Некорректные значения: K={K}, N={N}")
+        
+        # 2. Позиции роботов
+        robots = []
+        for i in range(K):
+            try:
+                x, y, z = map(float, lines[1 + i].split())
+                robots.append(RobotConfig(
+                    base_xyz=(x, y, z),
+                    joint_limits=[],  # Будет заполнено позже
+                    vmax=[],
+                    amax=[],
+                    tool_clearance=0.0,  # Будет заполнено позже
+                    robot_id=i + 1
+                ))
+                logger.debug(f"Робот {i+1}: позиция ({x}, {y}, {z})")
+            except (ValueError, IndexError) as e:
+                logger.error(f"Ошибка в строке робота {i+1}: {e}")
+                raise ValueError(f"Некорректная позиция робота {i+1}")
+        
+        # 3. Ограничения суставов (6 строк)
+        joint_limits = []
+        vmax = []
+        amax = []
+        
+        for j in range(6):
+            try:
+                jmin, jmax, v, a = map(float, lines[1 + K + j].split())
+                joint_limits.append((jmin, jmax))
+                vmax.append(v)
+                amax.append(a)
+                logger.debug(f"Сустав {j+1}: [{jmin}, {jmax}], vmax={v}, amax={a}")
+            except (ValueError, IndexError) as e:
+                logger.error(f"Ошибка в строке сустава {j+1}: {e}")
+                raise ValueError(f"Некорректные ограничения сустава {j+1}")
+        
+        # Обновляем роботов с ограничениями
+        for robot in robots:
+            robot.joint_limits = joint_limits
+            robot.vmax = vmax
+            robot.amax = amax
+        
+        # 4. Tool_clearance Safe_dist
+        try:
+            tool_clearance, safe_dist = map(float, lines[1 + K + 6].split())
+            logger.debug(f"Tool clearance: {tool_clearance}, Safe distance: {safe_dist}")
+        except (ValueError, IndexError) as e:
+            logger.error(f"Ошибка в строке tool_clearance/safe_dist: {e}")
+            raise ValueError("Некорректные значения tool_clearance/safe_dist")
+        
+        # Обновляем tool_clearance для всех роботов
+        for robot in robots:
+            robot.tool_clearance = tool_clearance
+        
+        # 5. Операции
+        operations = []
+        for i in range(N):
+            try:
+                px, py, pz, qx, qy, qz, t = map(float, lines[1 + K + 7 + i].split())
+                operations.append(Operation(
+                    pick_xyz=(px, py, pz),
+                    place_xyz=(qx, qy, qz),
+                    t_hold=t
+                ))
+                logger.debug(f"Операция {i+1}: pick=({px}, {py}, {pz}), place=({qx}, {qy}, {qz}), t={t}")
+            except (ValueError, IndexError) as e:
+                logger.error(f"Ошибка в строке операции {i+1}: {e}")
+                raise ValueError(f"Некорректная операция {i+1}")
+        
+        scenario = ScenarioTxt(
+            robots=robots,
+            operations=operations,
+            safe_dist=safe_dist
+        )
+        
+        logger.info(f"Успешно загружено {len(robots)} роботов и {len(operations)} операций")
+        return scenario
+        
+    except Exception as e:
+        logger.error(f"Ошибка парсинга TXT содержимого: {e}")
+        return None
+
 def parse_txt_input(path: str) -> Optional[ScenarioTxt]:
     """
     Парсит TXT файл в формате ТЗ с обработкой ошибок.

@@ -178,9 +178,31 @@ def run_planner_algorithm(input_data: ScenarioTxt, assignment_method: str = "bal
     logger.info("Запуск планировщика траекторий")
     
     try:
+        # Проверяем, что есть роботы
+        if not input_data.robots:
+            logger.error("Нет роботов в сценарии")
+            return {
+                "robots": [],
+                "makespan": 0.0,
+                "safe_dist": input_data.safe_dist,
+                "assignment_method": assignment_method,
+                "error": "Нет роботов в сценарии"
+            }
+        
         # 1. Назначение операций роботам
         assignments = assign_operations(input_data, assignment_method)
         logger.info(f"Операции назначены методом: {assignment_method}")
+        
+        # Проверяем, что назначения корректны
+        if not assignments:
+            logger.error("Не удалось назначить операции роботам")
+            return {
+                "robots": [],
+                "makespan": 0.0,
+                "safe_dist": input_data.safe_dist,
+                "assignment_method": assignment_method,
+                "error": "Не удалось назначить операции роботам"
+            }
         
         # 2. Планирование траекторий для каждого робота
         robot_trajectories = []

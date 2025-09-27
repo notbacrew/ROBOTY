@@ -57,6 +57,12 @@ def assign_operations_balanced(scenario: ScenarioTxt) -> List[List[Operation]]:
     Улучшенная версия с гарантией минимального количества операций на робота.
     """
     K = len(scenario.robots)
+    
+    # Проверяем, что есть роботы
+    if K == 0:
+        logger.error("Нет роботов для назначения операций")
+        return []
+    
     assignments = [[] for _ in range(K)]
     robot_loads = [0.0] * K  # текущая нагрузка каждого робота
     
@@ -205,6 +211,16 @@ def assign_operations(scenario: ScenarioTxt, method: str = "balanced") -> List[L
         Список операций для каждого робота
     """
     logger.info(f"Начинаем назначение операций методом: {method}")
+    
+    # Проверяем, что есть роботы
+    if not scenario.robots:
+        logger.error("Нет роботов в сценарии")
+        return []
+    
+    # Проверяем, что есть операции
+    if not scenario.operations:
+        logger.warning("Нет операций для назначения")
+        return [[] for _ in range(len(scenario.robots))]
     
     if method == "round_robin":
         return assign_operations_round_robin(scenario)

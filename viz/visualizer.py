@@ -12,50 +12,6 @@ except Exception:
     load_obj = None
     load_hand_definition = None
 
-def _add_chessboard(fig: go.Figure, plan: Dict[str, Any], tiles: int = 12, tile_size: float = 0.5) -> Dict[str, Any]:
-    """
-    Добавляет под сцену «шахматную доску» (Surface) для выбора позиций роботов.
-    Возвращает словарь с параметрами доски для использования в JS (origin, tiles, tile_size, z).
-    """
-    try:
-        robots = plan.get("robots", []) if isinstance(plan, dict) else []
-        zs: List[float] = []
-        for r in robots:
-            traj = r.get("trajectory", [])
-            if traj:
-                zs.extend([float(p.get("z", 0.0)) for p in traj])
-            base = r.get("base_xyz")
-            if isinstance(base, (list, tuple)) and len(base) == 3:
-                zs.append(float(base[2]))
-        z_min = min(zs) if zs else 0.0
-        z_plane = z_min - 0.05
-        half = tiles * tile_size / 2.0
-        x0 = -half
-        y0 = -half
-        # Сетка для Surface: (tiles+1)x(tiles+1)
-        xs = np.linspace(x0, x0 + tiles * tile_size, tiles + 1)
-        ys = np.linspace(y0, y0 + tiles * tile_size, tiles + 1)
-        X, Y = np.meshgrid(xs, ys)
-        Z = np.full_like(X, fill_value=z_plane, dtype=float)
-        # Цвета клеток: чёрно-белые по чётности клетки
-        # surfacecolor должен иметь ту же форму, зададим через сумму индексов
-        parity = np.add.outer(np.arange(tiles + 1), np.arange(tiles + 1)) % 2
-        # Нормализуем к 0..1
-        surfacecolor = parity.astype(float)
-        board = go.Surface(
-            x=X, y=Y, z=Z,
-            surfacecolor=surfacecolor,
-            colorscale=[[0.0, "#eaeaea"], [1.0, "#cfcfcf"]],
-            showscale=False,
-            opacity=1.0,
-            name="Board"
-        )
-        fig.add_trace(board)
-        return {"origin": [x0, y0], "tiles": int(tiles), "tile_size": float(tile_size), "z": float(z_plane)}
-    except Exception as e:
-        logger.warning(f"Не удалось добавить шахматную доску: {e}")
-        return {"origin": [-3.0, -3.0], "tiles": int(tiles), "tile_size": float(tile_size), "z": 0.0}
-
 def _interpolate_position(trajectory: List[Dict[str, Any]], t: float) -> Tuple[float, float, float]:
     """
     Линейная интерполяция позиции TCP по времени t.
@@ -81,6 +37,202 @@ def _interpolate_position(trajectory: List[Dict[str, Any]], t: float) -> Tuple[f
             return (x, y, z)
     p = trajectory[-1]
     return (p["x"], p["y"], p["z"])
+
+def create_desktop_3d_visualization(plan: Dict[str, Any]) -> go.Figure:
+    """
+    Создает оптимизированную 3D визуализацию для десктопного режима с точечным воспроизведением.
+    """
+    logger.info("Создание десктопной 3D визуализации с точечным воспроизведением")
+    
+    fig = go.Figure()
+    robots = plan["robots"]
+    
+    # Цвета для роботов
+    colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
+    
+    # Для каждого робота рисуем только ключевые точки траектории
+    for i, robot in enumerate(robots):
+        color = colors[i % len(colors)]
+        trajectory = robot["trajectory"]
+        
+        if not trajectory:
+            logger.warning(f"Робот {robot['id']} не имеет траектории")
+            continue
+        
+        # Берем только ключевые точки для десктопного режима (каждая 5-я точка)
+        step = max(1, len(trajectory) // 20)  # Максимум 20 точек на робота
+        key_trajectory = trajectory[::step]
+        
+        # Извлекаем координаты
+        xs = [p["x"] for p in key_trajectory]
+        ys = [p["y"] for p in key_trajectory]
+        zs = [p["z"] for p in key_trajectory]
+        ts = [p["t"] for p in key_trajectory]
+        
+        # Траектория - только точки, без линий
+        fig.add_trace(go.Scatter3d(
+            x=xs, y=ys, z=zs,
+            mode="markers",  # Только маркеры, без линий
+            name=f"Robot {robot['id']}",
+            marker=dict(size=6, color=color, symbol="circle"),
+            hovertemplate=f"<b>Robot {robot['id']}</b><br>" +
+                         "X: %{x:.3f}<br>" +
+                         "Y: %{y:.3f}<br>" +
+                         "Z: %{z:.3f}<br>" +
+                         "Time: %{customdata:.2f}s<extra></extra>",
+            customdata=ts
+        ))
+        
+        # База робота
+        base_xyz = robot.get("base_xyz", [0, 0, 0])
+        fig.add_trace(go.Scatter3d(
+            x=[base_xyz[0]], y=[base_xyz[1]], z=[base_xyz[2]],
+            mode="markers",
+            name=f"Base {robot['id']}",
+            marker=dict(size=12, color=color, symbol="square"),
+            showlegend=False
+        ))
+        
+        # Добавляем 3D модели роботов для ключевых позиций
+        robot_mesh_cfg = plan.get("robot_mesh")
+        if robot_mesh_cfg and load_obj:
+            # Загружаем 3D модель робота
+            mesh_path = robot_mesh_cfg.get("path", "assets/robots/kuka/kr_300.obj")
+            mesh_scale = float(robot_mesh_cfg.get("scale", 1.0))
+            
+            try:
+                mesh_data = load_obj(mesh_path, mesh_scale)
+                if mesh_data:
+                    # Добавляем 3D модель для ключевых позиций
+                    for j, point in enumerate(key_trajectory[::max(1, len(key_trajectory)//3)]):  # Максимум 3 позы
+                        base = tuple(robot.get("base_xyz", [0, 0, 0]))
+                        tcp = (point["x"], point["y"], point["z"])
+                        
+                        # Трансформируем модель к позиции робота
+                        xs_mesh, ys_mesh, zs_mesh, i_mesh, j_mesh, k_mesh = mesh_data
+                        
+                        # Простая трансформация: перемещение к базе робота
+                        dx, dy, dz = base
+                        xs_transformed = [x + dx for x in xs_mesh]
+                        ys_transformed = [y + dy for y in ys_mesh]
+                        zs_transformed = [z + dz for z in zs_mesh]
+                        
+                        mesh_trace = go.Mesh3d(
+                            x=xs_transformed, y=ys_transformed, z=zs_transformed,
+                            i=i_mesh, j=j_mesh, k=k_mesh,
+                            color=color,
+                            opacity=0.7,
+                            name=f"Robot Model R{robot['id']}" if j == 0 else "",
+                            showlegend=j == 0
+                        )
+                        fig.add_trace(mesh_trace)
+                        
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить 3D модель робота: {e}")
+        
+        # Добавляем упрощенную модель руки (только для ключевых точек)
+        arm_segments = plan.get("arm_segments", 3)
+        
+        # Загружаем определение руки, если доступно
+        hand_def = None
+        hand_cfg = plan.get("hand_definition")
+        if load_hand_definition is not None and isinstance(hand_cfg, dict):
+            hpath = hand_cfg.get("path")
+            hscale = float(hand_cfg.get("scale", 1.0))
+            if isinstance(hpath, str):
+                hand_def = load_hand_definition(hpath, hscale)
+        
+        for j, point in enumerate(key_trajectory[::max(1, len(key_trajectory)//5)]):  # Максимум 5 поз
+            base = tuple(robot.get("base_xyz", [0, 0, 0]))
+            tcp = (point["x"], point["y"], point["z"])
+            
+            # Создаем упрощенную модель руки
+            joints = _arm_segments(base, tcp, arm_segments, 
+                                 plan.get("arm_bulge", 0.1), 
+                                 plan.get("arm_model", "curved"))
+            
+            # Рисуем сегменты руки
+            xs_arm = []
+            ys_arm = []
+            zs_arm = []
+            for k in range(len(joints) - 1):
+                xs_arm += [joints[k][0], joints[k+1][0], None]
+                ys_arm += [joints[k][1], joints[k+1][1], None]
+                zs_arm += [joints[k][2], joints[k+1][2], None]
+            
+            fig.add_trace(go.Scatter3d(
+                x=xs_arm, y=ys_arm, z=zs_arm,
+                mode="lines",
+                name=f"Arm R{robot['id']}" if j == 0 else "",
+                line=dict(width=4, color=color),
+                showlegend=j == 0
+            ))
+            
+            # Добавляем руку, если есть определение
+            if hand_def is not None and bool(plan.get("arm_details", True)):
+                verts = hand_def.get('vertices', [])
+                segs_idx = hand_def.get('segments', [])
+                if verts and segs_idx:
+                    # Трансформируем руку к TCP
+                    dx, dy, dz = tcp
+                    hx = []; hy = []; hz = []
+                    for a_idx, b_idx in segs_idx:
+                        if 0 <= a_idx < len(verts) and 0 <= b_idx < len(verts):
+                            hx += [verts[a_idx][0] + dx, verts[b_idx][0] + dx, None]
+                            hy += [verts[a_idx][1] + dy, verts[b_idx][1] + dy, None]
+                            hz += [verts[a_idx][2] + dz, verts[b_idx][2] + dz, None]
+                    
+                    if hx:  # Если есть данные для руки
+                        fig.add_trace(go.Scatter3d(
+                            x=hx, y=hy, z=hz,
+                            mode="lines",
+                            name=f"Hand R{robot['id']}" if j == 0 else "",
+                            line=dict(width=3, color=color),
+                            showlegend=j == 0
+                        ))
+    
+    # Объекты (если заданы)
+    objects = plan.get("objects", [])
+    for obj in objects:
+        if obj.get("type", "cube") == "cube":
+            center = tuple(obj.get("initial_position", [0, 0, 0]))
+            size = float(obj.get("size", 0.1))
+            xs, ys, zs = _cube_edges(center, size)
+            fig.add_trace(go.Scatter3d(
+                x=xs, y=ys, z=zs, mode="lines", name=f"Object {obj.get('id','?')}",
+                line=dict(color=obj.get("color", "red"), width=4)
+            ))
+    
+    # Настройка макета для десктопного режима
+    makespan = plan.get("makespan", 0.0)
+    title = f"Desktop 3D Visualization - Robot Trajectories (makespan = {makespan:.2f} sec)"
+    if plan.get("assignment_method"):
+        title += f" - {plan['assignment_method']}"
+    
+    fig.update_layout(
+        title=title,
+        scene=dict(
+            xaxis_title="X (m)",
+            yaxis_title="Y (m)",
+            zaxis_title="Z (m)",
+            camera=dict(
+                eye=dict(x=1.5, y=1.5, z=1.5)
+            ),
+            aspectmode="data"
+        ),
+        width=1200,
+        height=800,
+        showlegend=True,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        )
+    )
+    
+    logger.info("Десктопная 3D визуализация создана")
+    return fig
 
 def _arm_segments(base: Tuple[float, float, float], tcp: Tuple[float, float, float], segments: int = 4, bulge: float = 0.15, model: str = "curved") -> List[Tuple[float, float, float]]:
     """
@@ -306,11 +458,79 @@ def _transform_mesh_vertices(xs: List[float], ys: List[float], zs: List[float], 
     Vp = (R @ V).T + np.asarray(t, dtype=float)  # Nx3
     return Vp[:,0].tolist(), Vp[:,1].tolist(), Vp[:,2].tolist()
 
+def _create_robot_pose_mesh(robot_mesh_data: Tuple, base: Tuple[float, float, float], tcp: Tuple[float, float, float], 
+                           color: str, robot_id: int, pose_interpolation: float = 0.0) -> go.Mesh3d:
+    """
+    Создает 3D меш робота в заданной позе с возможностью интерполяции между позами.
+    
+    Args:
+        robot_mesh_data: Данные меша (xs, ys, zs, is, js, ks)
+        base: Позиция базы робота
+        tcp: Позиция TCP (Tool Center Point)
+        color: Цвет робота
+        robot_id: ID робота
+        pose_interpolation: Коэффициент интерполяции позы (0.0 = начальная поза, 1.0 = конечная поза)
+    """
+    try:
+        xs0, ys0, zs0, is_, js_, ks_ = robot_mesh_data
+        
+        # Вычисляем направление от базы к TCP
+        from_dir = np.array([0.0, 0.0, 1.0], dtype=float)
+        to_vec = np.array([tcp[0] - base[0], tcp[1] - base[1], tcp[2] - base[2]], dtype=float)
+        
+        if np.linalg.norm(to_vec) < 1e-9:
+            R = np.eye(3)
+        else:
+            R = _rotation_matrix_from_vectors(from_dir, to_vec)
+        
+        # Применяем интерполяцию позы для более естественного движения
+        if pose_interpolation > 0.0:
+            # Добавляем плавное вращение для более естественного движения
+            # Используем синусоидальную интерполяцию для более плавного движения
+            smooth_interp = 0.5 * (1 - np.cos(pose_interpolation * np.pi))
+            angle = smooth_interp * np.pi * 0.2  # Увеличиваем амплитуду поворота
+            cos_a, sin_a = np.cos(angle), np.sin(angle)
+            rotation_z = np.array([
+                [cos_a, -sin_a, 0],
+                [sin_a, cos_a, 0],
+                [0, 0, 1]
+            ])
+            R = R @ rotation_z
+            
+            # Добавляем небольшое вертикальное покачивание
+            vertical_sway = 0.1 * np.sin(pose_interpolation * np.pi * 2)
+            vertical_rotation = np.array([
+                [1, 0, 0],
+                [0, np.cos(vertical_sway), -np.sin(vertical_sway)],
+                [0, np.sin(vertical_sway), np.cos(vertical_sway)]
+            ])
+            R = R @ vertical_rotation
+        
+        # Трансформируем вершины меша
+        txs, tys, tzs = _transform_mesh_vertices(xs0, ys0, zs0, R, base)
+        
+        return go.Mesh3d(x=txs, y=tys, z=tzs, i=is_, j=js_, k=ks_,
+                        color=color, opacity=0.7,
+                        name=f"RobotMesh R{robot_id}", showlegend=False)
+    except Exception as e:
+        logger.warning(f"Ошибка создания позы робота {robot_id}: {e}")
+        # Fallback: простая линия
+        xs_l = [base[0], tcp[0]]
+        ys_l = [base[1], tcp[1]]
+        zs_l = [base[2], tcp[2]]
+        return go.Scatter3d(x=xs_l, y=ys_l, z=zs_l, mode="lines",
+                           line=dict(width=6, color=color),
+                           name=f"Arm R{robot_id}", showlegend=False)
+
 def create_3d_visualization(plan: Dict[str, Any]) -> go.Figure:
     """
     Создает 3D визуализацию траекторий роботов с зонами безопасности и коллизиями.
     """
     logger.info("Создание 3D визуализации траекторий")
+    
+    # Проверяем, нужна ли точечная визуализация для десктопного режима
+    if plan.get("desktop_mode", False):
+        return create_desktop_3d_visualization(plan)
     
     fig = go.Figure()
     robots = plan["robots"]
@@ -358,6 +578,20 @@ def create_3d_visualization(plan: Dict[str, Any]) -> go.Figure:
             marker=dict(size=10, color=color, symbol="square"),
             showlegend=False
         ))
+        
+        # Добавляем 3D модель робота в статичной визуализации
+        robot_mesh = plan.get("robot_mesh")
+        if robot_mesh and load_obj:
+            try:
+                # Загружаем 3D модель
+                mesh_data = load_obj(robot_mesh["path"], robot_mesh.get("scale", 1.0))
+                if mesh_data:
+                    # Создаем 3D модель робота в начальной позиции
+                    tcp = (xs[0], ys[0], zs[0]) if xs and ys and zs else base_xyz
+                    robot_mesh_obj = _create_robot_pose_mesh(mesh_data, base_xyz, tcp, color, robot['id'], 0.0)
+                    fig.add_trace(robot_mesh_obj)
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить 3D модель робота {robot['id']}: {e}")
         
         # Зоны безопасности (упрощенно - только в ключевых точках)
         tool_clearance = robot.get("tool_clearance", 0.0)
@@ -575,22 +809,29 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
     logger.info(f"Запуск визуализации типа: {visualization_type}")
     
     try:
-        board_info = None
         if visualization_type == "3d":
             fig = create_3d_visualization(plan)
-            # Добавляем шахматную доску для выбора позиций
-            board_info = _add_chessboard(fig, plan)
+        elif visualization_type == "3d_desktop":
+            # Десктопная визуализация с точечным воспроизведением
+            plan["desktop_mode"] = True
+            fig = create_desktop_3d_visualization(plan)
         elif visualization_type.startswith("2d_"):
             projection = visualization_type.split("_")[1]
             fig = create_2d_projection(plan, projection)
         elif visualization_type == "time":
             fig = create_time_analysis(plan)
-        elif visualization_type == "3d_anim":
+        else:
+            raise ValueError(f"Неизвестный тип визуализации: {visualization_type}")
+        
+        # Для простых типов визуализации возвращаем фигуру
+        if visualization_type != "3d_anim":
+            return fig
+        
+        # Для анимации продолжаем обработку
+        if visualization_type == "3d_anim":
             # Реал-тайм анимация с использованием кадров по времени
             logger.info("Создание 3D анимации траекторий")
             base_fig = create_3d_visualization({**plan, "robots": []})
-            # Шахматная доска на фоне
-            board_info = _add_chessboard(base_fig, plan)
             if callable(progress_callback):
                 try:
                     progress_callback(5)
@@ -613,11 +854,17 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
             if not times:
                 raise ValueError("Нет точек траектории для анимации")
 
-            # Ускоряем воспроизведение: даунсэмплим количество кадров
-            max_frames = int(plan.get("max_anim_frames", 300))
+            # АГРЕССИВНО ограничиваем количество кадров для экономии памяти
+            max_frames = int(plan.get("max_anim_frames", 50))  # По умолчанию очень мало кадров
             if len(times) > max_frames and max_frames > 0:
                 step = int(np.ceil(len(times) / max_frames))
                 times = times[::step]
+                logger.info(f"Ограничиваем анимацию: {len(times)} кадров из {len(times) * step}")
+            
+            # Дополнительное ограничение для больших сцен
+            if len(robots) >= 6 and len(times) > 40:
+                times = times[::2]  # Берем каждый второй кадр
+                logger.info(f"Дополнительное ограничение для {len(robots)} роботов: {len(times)} кадров")
             if callable(progress_callback):
                 try:
                     progress_callback(10)
@@ -633,23 +880,44 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                                                 line=dict(width=6, color=color),
                                                 marker=dict(size=4, color=color)))
 
-            # 2) Рука как линии (по роботу)
+            # 2) Рука как линии (по роботу) — убираем дублирование и легенду
             for i, robot in enumerate(robots):
                 base_fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode="lines",
                                                 name=f"Arm R{robot['id']}",
-                                                line=dict(width=8, color=colors[i % len(colors)]),
-                                                showlegend=True))
+                                                line=dict(width=6, color=colors[i % len(colors)]),
+                                                showlegend=False))
 
-            # Загрузка внешних мешей роботов (если задано в плане)
+            # Загрузка внешних мешей роботов (если задано в плане) - ОГРАНИЧИВАЕМ ТЯЖЕЛЫЕ МОДЕЛИ
             robot_mesh_cfg = plan.get("robot_mesh")
             robot_mesh_data = None
             if load_obj is not None and isinstance(robot_mesh_cfg, dict):
                 path = robot_mesh_cfg.get("path")
                 scale = float(robot_mesh_cfg.get("scale", 1.0))
                 if isinstance(path, str):
-                    mesh = load_obj(path, scale)
-                    if mesh is not None:
-                        robot_mesh_data = mesh  # (xs, ys, zs, is, js, ks)
+                    # Проверяем, не тяжелый ли меш
+                    try:
+                        from core.mesh_loader import is_heavy_mesh
+                        is_heavy = is_heavy_mesh(path)
+                        if is_heavy:
+                            logger.warning(f"Тяжелый меш обнаружен: {path}, ОТКЛЮЧАЕМ для экономии памяти")
+                            robot_mesh_data = None  # Не загружаем тяжелые модели
+                            plan["robot_mesh"] = None  # Отключаем в плане
+                            plan["arm_mesh"] = True    # Используем простые сегменты
+                        else:
+                            mesh = load_obj(path, scale)
+                            if mesh is not None:
+                                robot_mesh_data = mesh
+                    except ImportError:
+                        is_heavy = "1758706684_68d3bbfcdbb32.obj" in path
+                        if is_heavy:
+                            logger.warning(f"Тяжелый меш обнаружен: {path}, ОТКЛЮЧАЕМ для экономии памяти")
+                            robot_mesh_data = None
+                            plan["robot_mesh"] = None
+                            plan["arm_mesh"] = True
+                        else:
+                            mesh = load_obj(path, scale)
+                            if mesh is not None:
+                                robot_mesh_data = mesh
 
             # Пользовательское описание руки/хватателя из внешнего файла (облегчённый формат)
             hand_def = None
@@ -688,22 +956,16 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
             # Если хотим заменить «двигающуюся дугу» реальной моделью руки — готовим плейсхолдеры меша (по одному на робота)
             use_robot_mesh = robot_mesh_data is not None
             replace_arc_with_model = bool(use_robot_mesh)
+            # Лёгкий режим: не обновлять меш в каждом кадре, только статически на t0
+            light_mesh_anim = bool(plan.get("light_mesh_anim", False))  # По умолчанию отключаем легкий режим для анимации модели
+            
+            # Добавляем плейсхолдеры для 3D моделей роботов (по одному на робота)
             if use_robot_mesh and replace_arc_with_model:
                 xs0, ys0, zs0, is0, js0, ks0 = robot_mesh_data
-                # Берем первый момент времени для инициализации позы
-                t0 = times[0]
                 for i, robot in enumerate(robots):
-                    base = tuple(robot.get("base_xyz", [0, 0, 0]))
-                    tcp0 = _interpolate_position(robot.get("trajectory", []), t0)
-                    from_dir = np.array([0.0, 0.0, 1.0], dtype=float)
-                    to_vec = np.array([tcp0[0] - base[0], tcp0[1] - base[1], tcp0[2] - base[2]], dtype=float)
-                    if np.linalg.norm(to_vec) < 1e-9:
-                        R0 = np.eye(3)
-                    else:
-                        R0 = _rotation_matrix_from_vectors(from_dir, to_vec)
-                    txs, tys, tzs = _transform_mesh_vertices(xs0, ys0, zs0, R0, base)
-                    placeholder = go.Mesh3d(x=txs, y=tys, z=tzs, i=is0, j=js0, k=ks0,
-                                            color=colors[i % len(colors)], opacity=0.6,
+                    # Создаем пустой плейсхолдер для 3D модели робота
+                    placeholder = go.Mesh3d(x=[], y=[], z=[], i=[], j=[], k=[],
+                                            color=colors[i % len(colors)], opacity=0.7,
                                             name=f"RobotMesh R{robot.get('id')}", showlegend=False)
                     base_fig.add_trace(placeholder)
             objects = plan.get("objects", [])
@@ -713,70 +975,83 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                                                 line=dict(color=obj.get("color", "red"), width=6)))
 
             frames = []
-            frames_no_arms = []
+            # Проверяем, используем ли легкий режим анимации
+            light_mesh_anim = bool(plan.get("light_mesh_anim", False))
+            
             for idx, t in enumerate(times):
                 frame_data = []
-                frame_data_no_arms = []
                 for i, robot in enumerate(robots):
-                    xs = [p["x"] for p in robot["trajectory"] if p["t"] <= t]
-                    ys = [p["y"] for p in robot["trajectory"] if p["t"] <= t]
-                    zs = [p["z"] for p in robot["trajectory"] if p["t"] <= t]
+                    # Ограничиваем количество точек траектории для экономии памяти
+                    trajectory_points = [p for p in robot["trajectory"] if p["t"] <= t]
+                    
+                    # Для больших сцен ограничиваем количество точек
+                    if len(robots) >= 6 and len(trajectory_points) > 20:
+                        # Берем только каждую 2-ю точку
+                        trajectory_points = trajectory_points[::2]
+                    elif len(trajectory_points) > 50:
+                        # Для любых сцен ограничиваем до 50 точек
+                        trajectory_points = trajectory_points[-50:]
+                    
+                    xs = [p["x"] for p in trajectory_points]
+                    ys = [p["y"] for p in trajectory_points]
+                    zs = [p["z"] for p in trajectory_points]
+                    
                     tcp_trace = go.Scatter3d(x=xs, y=ys, z=zs, mode="lines+markers",
                                              line=dict(width=6, color=colors[i % len(colors)]),
                                              marker=dict(size=4, color=colors[i % len(colors)]),
                                              name=f"Robot {robots[i].get('id')}")
                     frame_data.append(tcp_trace)
-                    # Для no_arms — TCP тот же
-                    frame_data_no_arms.append(tcp_trace)
 
-                # Манипулятор: звенья base→tcp
+                # Манипулятор: звенья base→tcp или 3D модель робота
                 for i, robot in enumerate(robots):
                     base = tuple(robot.get("base_xyz", [0, 0, 0]))
                     tcp = _interpolate_position(robot.get("trajectory", []), t)
                     if replace_arc_with_model and use_robot_mesh:
-                        # Поворачиваем и переносим пользовательский меш так, чтобы его ось Z смотрела на TCP
-                        try:
-                            xs0, ys0, zs0, is_, js_, ks_ = robot_mesh_data
-                            from_dir = np.array([0.0, 0.0, 1.0], dtype=float)
-                            to_vec = np.array([tcp[0] - base[0], tcp[1] - base[1], tcp[2] - base[2]], dtype=float)
-                            if np.linalg.norm(to_vec) < 1e-9:
-                                R = np.eye(3)
+                        # Анимируем 3D модель робота
+                        if light_mesh_anim:
+                            # В легком режиме используем статичную модель без интерполяции позы
+                            robot_mesh = _create_robot_pose_mesh(
+                                robot_mesh_data, base, tcp, 
+                                colors[i % len(colors)], robot.get('id'), 
+                                0.0  # Без интерполяции позы
+                            )
+                        else:
+                            # Полная анимация с интерполяцией позы
+                            trajectory = robot.get("trajectory", [])
+                            if len(trajectory) > 1:
+                                t_prev = trajectory[0]["t"]
+                                t_next = trajectory[-1]["t"]
+                                if t_prev < t_next:
+                                    pose_interpolation = (t - t_prev) / (t_next - t_prev)
+                                else:
+                                    pose_interpolation = 0.0
                             else:
-                                R = _rotation_matrix_from_vectors(from_dir, to_vec)
-                            txs, tys, tzs = _transform_mesh_vertices(xs0, ys0, zs0, R, base)
-                            arm_mesh = go.Mesh3d(x=txs, y=tys, z=tzs, i=is_, j=js_, k=ks_,
-                                                 color=colors[i % len(colors)], opacity=0.65,
-                                                 name=f"ArmMesh R{robot.get('id')}", showlegend=False)
-                            frame_data.append(arm_mesh)
-                            frame_data_no_arms.append(arm_mesh)
-                        except Exception as heavy_err:
-                            # Фоллбэк: рисуем лёгкую линию вместо меша в этом кадре
-                            xs_l = [base[0], tcp[0]]
-                            ys_l = [base[1], tcp[1]]
-                            zs_l = [base[2], tcp[2]]
-                            arm_trace = go.Scatter3d(x=xs_l, y=ys_l, z=zs_l, mode="lines",
-                                                     line=dict(width=6, color=colors[i % len(colors)]),
-                                                     name=f"Arm R{robot.get('id')}", showlegend=False)
-                            frame_data.append(arm_trace)
-                            # В no_arms — ничего не добавляем
+                                pose_interpolation = 0.0
+                            
+                            robot_mesh = _create_robot_pose_mesh(
+                                robot_mesh_data, base, tcp, 
+                                colors[i % len(colors)], robot.get('id'), 
+                                pose_interpolation
+                            )
+                        frame_data.append(robot_mesh)
                     else:
                         segs = int(plan.get("arm_segments", 5))
                         arm_model = str(plan.get("arm_model", "curved"))
                         joints = _arm_segments(base, tcp, segments=max(2, segs), bulge=float(plan.get("arm_bulge", 0.18)), model=arm_model)
-                        xs_l = []
-                        ys_l = []
-                        zs_l = []
-                        for j in range(len(joints) - 1):
-                            xs_l += [joints[j][0], joints[j+1][0], None]
-                            ys_l += [joints[j][1], joints[j+1][1], None]
-                            zs_l += [joints[j][2], joints[j+1][2], None]
-                        arm_trace = go.Scatter3d(x=xs_l, y=ys_l, z=zs_l, mode="lines",
-                                                 line=dict(width=8, color=colors[i % len(colors)]),
-                                                 name=f"Arm R{robot.get('id')}",
-                                                 showlegend=False)
-                        frame_data.append(arm_trace)
-                        no_arm_trace = arm_trace.to_plotly_json(); no_arm_trace["opacity"] = 0.0
-                        frame_data_no_arms.append(go.Scatter3d(**{k: v for k, v in no_arm_trace.items() if k != "type"}))
+                        # Линия-дуга руки (по желанию)
+                        if bool(plan.get("show_arm_line", True)):
+                            xs_l = []
+                            ys_l = []
+                            zs_l = []
+                            for j in range(len(joints) - 1):
+                                xs_l += [joints[j][0], joints[j+1][0], None]
+                                ys_l += [joints[j][1], joints[j+1][1], None]
+                                zs_l += [joints[j][2], joints[j+1][2], None]
+                            arm_trace = go.Scatter3d(x=xs_l, y=ys_l, z=zs_l, mode="lines",
+                                                     line=dict(width=6, color=colors[i % len(colors)]),
+                                                     name=f"Arm R{robot.get('id')}",
+                                                     showlegend=False)
+                            frame_data.append(arm_trace)
 
                     # Mesh-представление (боксы/цилиндры по сегментам) — используем только если НЕ заменяем реальной моделью
                     if use_mesh_arm and not replace_arc_with_model:
@@ -790,12 +1065,8 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                                 mesh = _oriented_box_mesh(p1, p2, thickness=thickness, color=colors[i % len(colors)])
                             mesh.update(name=f"ArmMesh R{robot.get('id')}", showlegend=False)
                             frame_data.append(mesh)
-                            # Соответствующий слот для no_arms: тот же меш с opacity=0
-                            mesh_no = mesh.to_plotly_json()
-                            mesh_no["opacity"] = 0.0
-                            frame_data_no_arms.append(go.Mesh3d(**{k: v for k, v in mesh_no.items() if k not in ("type",)}))
                         # Если есть внешний hand_definition — рисуем детальный хвататель как линии
-                        if hand_def is not None:
+                        if hand_def is not None and bool(plan.get("arm_details", True)):
                             verts = hand_def.get('vertices', [])
                             segs_idx = hand_def.get('segments', [])
                             if verts and segs_idx:
@@ -812,7 +1083,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                                 frame_data.append(go.Scatter3d(x=hx, y=hy, z=hz, mode="lines", line=dict(width=6, color=colors[i % len(colors)]), name=f"Gripper R{robot.get('id')}", showlegend=False))
                                 frame_data_no_arms.append(go.Scatter3d(x=hx, y=hy, z=hz, mode="lines", line=dict(width=0, color=colors[i % len(colors)]), name=f"Gripper R{robot.get('id')}", showlegend=False))
                         # Узлы: плечо, локоть, запястье
-                        if len(joints) >= 3:
+                        if bool(plan.get("arm_details", True)) and len(joints) >= 3:
                             shoulder = joints[0]
                             elbow = joints[len(joints)//2]
                             wrist = joints[-2]
@@ -820,38 +1091,33 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                             for center in (shoulder, elbow, wrist):
                                 sph = _sphere_mesh(center, sph_r, color=colors[i % len(colors)])
                                 frame_data.append(sph)
-                                sph_no = sph.to_plotly_json(); sph_no["opacity"] = 0.0
-                                frame_data_no_arms.append(go.Mesh3d(**{k: v for k, v in sph_no.items() if k != "type"}))
                         # Простая хваталка: две тонкие пластины у TCP
-                        tcp_arr = np.array(tcp, dtype=float)
-                        prev_arr = np.array(joints[-2], dtype=float)
-                        dir_vec = tcp_arr - prev_arr
-                        n = np.linalg.norm(dir_vec)
-                        if n > 1e-9:
-                            dir_vec = dir_vec / n
-                        else:
-                            dir_vec = np.array([1.0, 0.0, 0.0])
-                        ref = np.array([0.0, 0.0, 1.0])
-                        side = np.cross(dir_vec, ref)
-                        if np.linalg.norm(side) < 1e-6:
-                            ref = np.array([0.0, 1.0, 0.0])
+                        if bool(plan.get("arm_details", True)):
+                            tcp_arr = np.array(tcp, dtype=float)
+                            prev_arr = np.array(joints[-2], dtype=float)
+                            dir_vec = tcp_arr - prev_arr
+                            n = np.linalg.norm(dir_vec)
+                            if n > 1e-9:
+                                dir_vec = dir_vec / n
+                            else:
+                                dir_vec = np.array([1.0, 0.0, 0.0])
+                            ref = np.array([0.0, 0.0, 1.0])
                             side = np.cross(dir_vec, ref)
-                        side = side / (np.linalg.norm(side) + 1e-12)
-                        gap = thickness * 0.6
-                        plate_len = thickness * 2.0
-                        plate_th = thickness * 0.25
-                        p_left1 = tuple(tcp_arr + side * gap)
-                        p_left2 = tuple(tcp_arr + side * gap + dir_vec * plate_len)
-                        p_right1 = tuple(tcp_arr - side * gap)
-                        p_right2 = tuple(tcp_arr - side * gap + dir_vec * plate_len)
-                        left_plate = _oriented_box_mesh(p_left1, p_left2, thickness=plate_th, color=colors[i % len(colors)])
-                        right_plate = _oriented_box_mesh(p_right1, p_right2, thickness=plate_th, color=colors[i % len(colors)])
-                        left_plate.update(showlegend=False); right_plate.update(showlegend=False)
-                        frame_data.append(left_plate); frame_data.append(right_plate)
-                        lp_no = left_plate.to_plotly_json(); lp_no["opacity"] = 0.0
-                        rp_no = right_plate.to_plotly_json(); rp_no["opacity"] = 0.0
-                        frame_data_no_arms.append(go.Mesh3d(**{k: v for k, v in lp_no.items() if k != "type"}))
-                        frame_data_no_arms.append(go.Mesh3d(**{k: v for k, v in rp_no.items() if k != "type"}))
+                            if np.linalg.norm(side) < 1e-6:
+                                ref = np.array([0.0, 1.0, 0.0])
+                                side = np.cross(dir_vec, ref)
+                            side = side / (np.linalg.norm(side) + 1e-12)
+                            gap = thickness * 0.6
+                            plate_len = thickness * 2.0
+                            plate_th = thickness * 0.25
+                            p_left1 = tuple(tcp_arr + side * gap)
+                            p_left2 = tuple(tcp_arr + side * gap + dir_vec * plate_len)
+                            p_right1 = tuple(tcp_arr - side * gap)
+                            p_right2 = tuple(tcp_arr - side * gap + dir_vec * plate_len)
+                            left_plate = _oriented_box_mesh(p_left1, p_left2, thickness=plate_th, color=colors[i % len(colors)])
+                            right_plate = _oriented_box_mesh(p_right1, p_right2, thickness=plate_th, color=colors[i % len(colors)])
+                            left_plate.update(showlegend=False); right_plate.update(showlegend=False)
+                            frame_data.append(left_plate); frame_data.append(right_plate)
                     else:
                         # Если меш-рука отключена, но плейсхолдеры были не добавлены — ничего не добавляем и в кадрах
                         pass
@@ -901,8 +1167,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                                                            marker=dict(size=6, color="yellow"),
                                                            text=[f"R{current_carrier_id}"], textposition="top center",
                                                            name=f"Carrier R{current_carrier_id}", showlegend=False))
-                frames.append(go.Frame(data=frame_data, name=f"t={t:.2f}|arms"))
-                frames_no_arms.append(go.Frame(data=frame_data_no_arms, name=f"t={t:.2f}|noarms"))
+                frames.append(go.Frame(data=frame_data, name=f"t={t:.2f}"))
                 if callable(progress_callback):
                     # 10..95% в процессе подготовки кадров
                     pct = 10 + int(85 * (idx + 1) / max(1, len(times)))
@@ -911,7 +1176,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                     except Exception:
                         pass
 
-            base_fig.update(frames=frames + frames_no_arms)
+            base_fig.update(frames=frames)
             if callable(progress_callback):
                 try:
                     progress_callback(97)
@@ -924,7 +1189,7 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                 steps.append({
                     "method": "animate",
                     "label": label,
-                    "args": [[f"{label}|arms"], {"mode": "immediate", "frame": {"duration": 0, "redraw": True}, "transition": {"duration": 0}}]
+                    "args": [[f"{label}"], {"mode": "immediate", "frame": {"duration": 0, "redraw": True}, "transition": {"duration": 0}}]
                 })
             base_fig.update_layout(
                 updatemenus=[
@@ -938,19 +1203,6 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                         "buttons": [
                             {"label": "▶ Старт", "method": "animate", "args": [None, {"frame": {"duration": 80, "redraw": True}, "fromcurrent": True, "mode": "immediate"}]},
                             {"label": "⏸ Пауза", "method": "animate", "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]},
-                        ]
-                    },
-                    {
-                        "type": "buttons",
-                        "showactive": True,
-                        # Под первой группой, выровнено по левому краю
-                        "x": 0.02,
-                        "y": 0.90,
-                        "direction": "left",
-                        "pad": {"r": 10, "t": 5},
-                        "buttons": [
-                            {"label": "С руками", "method": "animate", "args": [[ [f"t={t:.2f}|arms" for t in times] ], {"frame": {"duration": 80, "redraw": True}, "mode": "immediate"}]},
-                            {"label": "Без рук", "method": "animate", "args": [[ [f"t={t:.2f}|noarms" for t in times] ], {"frame": {"duration": 80, "redraw": True}, "mode": "immediate"}]}
                         ]
                     }
                 ],
@@ -1020,105 +1272,13 @@ def show_visualization(plan: Dict[str, Any], visualization_type: str = "3d", pro
                 "staticPlot": False,
                 "responsive": True
             }
-            # Добавляем интерактивный обработчик выбора позиций роботов на шахматной доске
-            try:
-                num_robots = int(len(plan.get("robots", []))) if isinstance(plan, dict) else 0
-            except Exception:
-                num_robots = 0
-            bi = board_info or {"origin": [-3.0, -3.0], "tiles": 12, "tile_size": 0.5, "z": 0.0}
-            post_script_header = (
-                "var gd = document.getElementsByClassName('plotly-graph-div')[0];\n"
-                f"var originX = {bi['origin'][0]};\n"
-                f"var originY = {bi['origin'][1]};\n"
-                f"var tiles = {bi['tiles']};\n"
-                f"var tileSize = {bi['tile_size']};\n"
-                f"var boardZ = {bi['z']};\n"
-                f"var totalRobots = {num_robots};\n"
-                "var occupied = new Set();\n"
-                "var selections = [];\n"
-            )
-            post_script_body = """
-function idxKey(i,j){ return i+','+j; }
-function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
-function addMarker(x,y,z,label){
-  Plotly.addTraces(gd, [{
-    type: 'scatter3d', mode: 'markers+text',
-    x: [x], y: [y], z: [z],
-    marker: {size: 6, color: '#222'},
-    text: [label], textposition: 'top center',
-    name: 'Placement'
-  }]);
-}
-async function copyToClipboard(text){
-  try{
-    if(navigator && navigator.clipboard && navigator.clipboard.writeText){
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  }catch(e){}
-  try{
-    var ta=document.createElement('textarea');
-    ta.value=text; document.body.appendChild(ta); ta.select();
-    var ok=document.execCommand('copy'); document.body.removeChild(ta);
-    return ok;
-  }catch(e){ return false; }
-}
-function download(filename, text) {
-  var element = document.createElement('a');
-  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-  element.setAttribute('download', filename);
-  element.style.display = 'none';
-  document.body.appendChild(element);
-  element.click();
-  document.body.removeChild(element);
-}
-function ensureButton(){
-  var id='save-robot-positions';
-  if(document.getElementById(id)) return;
-  var btn=document.createElement('button');
-  btn.id=id; btn.textContent='Сохранить позиции роботов';
-  btn.style.position='absolute'; btn.style.zIndex=1000; btn.style.right='12px'; btn.style.bottom='12px';
-  btn.style.padding='8px 12px'; btn.style.borderRadius='6px'; btn.style.border='1px solid #888';
-  btn.onclick=function(){ download('robot_positions.json', JSON.stringify(selections, null, 2)); };
-  gd.parentElement.style.position='relative';
-  gd.parentElement.appendChild(btn);
-  var id2='copy-robot-positions';
-  if(!document.getElementById(id2)){
-    var btn2=document.createElement('button');
-    btn2.id=id2; btn2.textContent='Скопировать позиции';
-    btn2.style.position='absolute'; btn2.style.zIndex=1000; btn2.style.right='12px'; btn2.style.bottom='48px';
-    btn2.style.padding='8px 12px'; btn2.style.borderRadius='6px'; btn2.style.border='1px solid #888';
-    btn2.onclick=async function(){
-      var ok=await copyToClipboard(JSON.stringify(selections, null, 2));
-      btn2.textContent = ok ? 'Скопировано ✓' : 'Скопировать позиции';
-      setTimeout(function(){ btn2.textContent='Скопировать позиции'; }, 1500);
-    };
-    gd.parentElement.appendChild(btn2);
-  }
-}
-gd.on('plotly_click', function(ev){
-  try{
-    if(totalRobots <= 0) return;
-    if(selections.length >= totalRobots) return;
-    if(!ev || !ev.points || !ev.points.length) return;
-    var p = ev.points[0];
-    var x = p.x, y = p.y;
-    var i = Math.floor((x - originX)/tileSize);
-    var j = Math.floor((y - originY)/tileSize);
-    if(i < 0 || j < 0 || i >= tiles || j >= tiles) return;
-    var key = idxKey(i,j);
-    if(occupied.has(key)) return;
-    occupied.add(key);
-    var cx = originX + (i + 0.5) * tileSize;
-    var cy = originY + (j + 0.5) * tileSize;
-    selections.push({robotIndex: selections.length, x: cx, y: cy, z: boardZ});
-    addMarker(cx, cy, boardZ, 'R' + selections.length);
-    if(selections.length === totalRobots){ ensureButton(); }
-  }catch(e){ /* noop */ }
-});
-""".strip()
-            post_script = post_script_header + post_script_body
-            fig.write_html(tmp_path, auto_open=False, config=plotly_config, post_script=post_script)
+            # Используем PlotlyJS из CDN, чтобы ускорить запись HTML
+            if callable(progress_callback):
+                try:
+                    progress_callback(99)
+                except Exception:
+                    pass
+            fig.write_html(tmp_path, auto_open=False, config=plotly_config, include_plotlyjs='cdn', full_html=True)
             logger.info(f"Визуализация записана во временный файл: {tmp_path}")
             # Пытаемся открыть в браузере
             try:
@@ -1144,6 +1304,14 @@ gd.on('plotly_click', function(ev){
             atexit.register(_safe_unlink, tmp_path)
             threading.Timer(300.0, _safe_unlink, args=(tmp_path,)).start()
 
+            # Очищаем кэш мешей для освобождения памяти
+            try:
+                from core.mesh_loader import clear_mesh_cache
+                clear_mesh_cache()
+                logger.info("Кэш мешей очищен для освобождения памяти")
+            except ImportError:
+                pass
+
             if callable(progress_callback):
                 try:
                     progress_callback(100)
@@ -1157,6 +1325,9 @@ gd.on('plotly_click', function(ev){
             except Exception as show_error:
                 logger.error(f"Не удалось отобразить визуализацию: {show_error}")
                 raise
+        
+        # Возвращаем фигуру для дальнейшего использования
+        return fig
         
     except Exception as e:
         logger.error(f"Ошибка при создании визуализации: {e}")
